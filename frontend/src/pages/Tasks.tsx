@@ -57,10 +57,13 @@ const Tasks = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [syncingOpenProject, setSyncingOpenProject] = useState(false);
   const [view, setView] = useState<View>(Views.MONTH);
   const [date, setDate] = useState(new Date());
   const [isConnected, setIsConnected] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
+  const [isOpenProjectConnected, setIsOpenProjectConnected] = useState(false);
+  const [openProjectUsername, setOpenProjectUsername] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Convert tasks to calendar events
@@ -88,7 +91,7 @@ const Tasks = () => {
     .sort((a, b) => a.start.getTime() - b.start.getTime())
     .slice(0, 10); // Get next 10
 
-  // Check if Google Calendar is connected
+  // Check if Google Calendar and OpenProject are connected
   const checkConnection = async () => {
     try {
       const response = await axios.get(
@@ -103,6 +106,7 @@ const Tasks = () => {
       console.log("[Tasks] Platform connections response:", response.data);
 
       if (response.data.success) {
+        // Check Google Calendar
         const googleCalendar = response.data.data.find(
           (platform: any) => platform.platform === "GOOGLE_CALENDAR"
         );
@@ -110,6 +114,15 @@ const Tasks = () => {
         setIsConnected(googleCalendar?.connected || false);
         setConnectedEmail(googleCalendar?.username || null);
         console.log("[Tasks] Connected email:", googleCalendar?.username);
+
+        // Check OpenProject
+        const openProject = response.data.data.find(
+          (platform: any) => platform.platform === "OPENPROJECT"
+        );
+        console.log("[Tasks] OpenProject connection:", openProject);
+        setIsOpenProjectConnected(openProject?.connected || false);
+        setOpenProjectUsername(openProject?.username || null);
+        console.log("[Tasks] OpenProject username:", openProject?.username);
       }
     } catch (error) {
       console.error("Failed to check connection:", error);
@@ -202,6 +215,60 @@ const Tasks = () => {
     }
   };
 
+  // Sync OpenProject
+  const syncOpenProject = async () => {
+    if (!isOpenProjectConnected) {
+      toast({
+        title: "Not Connected",
+        description: "Please connect to OpenProject first to sync your work packages.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSyncingOpenProject(true);
+    try {
+      console.log("[Tasks] Starting OpenProject sync...");
+      const response = await axios.put(
+        `${import.meta.env.VITE_API_URL || "http://localhost:5001"}/api/v1/platforms/sync/OPENPROJECT`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+          },
+        }
+      );
+
+      console.log("[Tasks] OpenProject sync response:", response.data);
+
+      if (response.data.success) {
+        toast({
+          title: "Sync Completed",
+          description: "OpenProject work packages synced successfully!",
+        });
+
+        // Wait a bit for the sync to complete
+        console.log("[Tasks] Waiting for sync to complete...");
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Refresh tasks immediately
+        console.log("[Tasks] Refreshing tasks...");
+        await fetchTasks();
+      }
+    } catch (error: any) {
+      console.error("Failed to sync OpenProject:", error);
+      console.error("Sync error details:", error.response?.data);
+      const message = error.response?.data?.message || "Failed to sync OpenProject. Please try again.";
+      toast({
+        title: "Sync Failed",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingOpenProject(false);
+    }
+  };
+
   useEffect(() => {
     checkConnection();
     fetchTasks();
@@ -266,7 +333,7 @@ const Tasks = () => {
     <DashboardLayout>
       <div className="space-y-6">
         {/* === TOP HEADER === */}
-        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
               <CalendarIcon className="text-cyan" />
@@ -276,43 +343,71 @@ const Tasks = () => {
               </span>
             </h1>
             <p className="text-muted-foreground mt-1">
-              View and manage your tasks from Google Calendar and other platforms
+              View and manage your tasks from Google Calendar, OpenProject, and other platforms
             </p>
-            {isConnected && connectedEmail && (
-              <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20">
-                <span className="text-green-500 text-sm">✓</span>
-                <span className="text-sm text-muted-foreground">Syncing from:</span>
-                <span className="text-sm font-semibold text-green-500">{connectedEmail}</span>
-              </div>
-            )}
-            {!isConnected && (
-              <p className="text-amber-500 text-sm mt-2 flex items-center gap-2">
-                ⚠️ Google Calendar not connected. Please{" "}
-                <a href="/connections" className="underline hover:text-amber-400">
-                  connect your calendar
-                </a>
-                {" "}first.
-              </p>
-            )}
+            <div className="mt-2 flex flex-col gap-2">
+              {isConnected && connectedEmail && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20">
+                  <span className="text-green-500 text-sm">✓</span>
+                  <span className="text-sm text-muted-foreground">Google Calendar:</span>
+                  <span className="text-sm font-semibold text-green-500">{connectedEmail}</span>
+                </div>
+              )}
+              {isOpenProjectConnected && openProjectUsername && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20">
+                  <span className="text-amber-500 text-sm">✓</span>
+                  <span className="text-sm text-muted-foreground">OpenProject:</span>
+                  <span className="text-sm font-semibold text-amber-500">{openProjectUsername}</span>
+                </div>
+              )}
+              {!isConnected && !isOpenProjectConnected && (
+                <p className="text-amber-500 text-sm flex items-center gap-2">
+                  ⚠️ No platforms connected. Please{" "}
+                  <a href="/connections" className="underline hover:text-amber-400">
+                    connect your platforms
+                  </a>
+                  {" "}first.
+                </p>
+              )}
+            </div>
           </div>
 
-          <Button
-            onClick={syncGoogleCalendar}
-            disabled={syncing || !isConnected}
-            className="btn-gradient flex-shrink-0"
-          >
-            {syncing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Syncing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Sync Google Calendar
-              </>
-            )}
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              onClick={syncGoogleCalendar}
+              disabled={syncing || !isConnected}
+              className="btn-gradient flex-shrink-0"
+            >
+              {syncing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Sync Google Calendar
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={syncOpenProject}
+              disabled={syncingOpenProject || !isOpenProjectConnected}
+              className="bg-amber-500 hover:bg-amber-600 text-white flex-shrink-0"
+            >
+              {syncingOpenProject ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Sync OpenProject
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* === MAIN TWO-COLUMN LAYOUT === */}
@@ -454,12 +549,12 @@ const Tasks = () => {
             <CalendarIcon className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
             <h3 className="text-xl font-semibold mb-2">No tasks found</h3>
             <p className="text-muted-foreground mb-4">
-              {isConnected
-                ? "Click 'Sync Google Calendar' to import your events as tasks"
-                : "Connect your Google Calendar to start seeing your events as tasks"
+              {isConnected || isOpenProjectConnected
+                ? "Click 'Sync' to import your tasks from connected platforms"
+                : "Connect your task platforms to start seeing your tasks here"
               }
             </p>
-            {!isConnected && (
+            {!isConnected && !isOpenProjectConnected && (
               <Button
                 onClick={() => (window.location.href = "/connections")}
                 className="btn-gradient"

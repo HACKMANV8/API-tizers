@@ -5,7 +5,7 @@ import StarField from "./StarField";
 import PrismLogo from "./PrismLogo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Settings, LayoutDashboard, Trophy, Link2, BarChart3, LogOut, Calendar } from "lucide-react";
+import { Settings, LayoutDashboard, Trophy, Link2, BarChart3, LogOut, Calendar, Briefcase } from "lucide-react";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -24,6 +24,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
     { icon: Calendar, label: "Tasks", path: "/tasks" },
+    { icon: Briefcase, label: "Projects", path: "/projects" },
     { icon: Trophy, label: "Leaderboard", path: "/leaderboard" },
     { icon: Link2, label: "Connections", path: "/connections" },
     { icon: BarChart3, label: "Analytics", path: "/analytics" },

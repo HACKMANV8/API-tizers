@@ -12,15 +12,16 @@ const platformsController = new PlatformsController();
  * @desc    Connect a platform account
  * @access  Private
  * @param   platform: GITHUB | LEETCODE | CODEFORCES | GOOGLE_CALENDAR | MS_CALENDAR | OPENPROJECT | SLACK
- * @body    username, accessToken (optional), platformUserId (optional)
+ * @body    username, accessToken (optional), platformUserId (optional), instanceUrl (required for OpenProject)
  */
 router.post(
   '/connect/:platform',
   authenticate,
   [
-    body('username').notEmpty().withMessage('Username is required'),
+    body('username').optional().isString(),
     body('accessToken').optional().isString(),
     body('platformUserId').optional().isString(),
+    body('instanceUrl').optional().isString(),
   ],
   validate,
   platformsController.connectPlatform
@@ -49,5 +50,20 @@ router.put('/sync/:platform', authenticate, platformsController.syncPlatform);
  * @param   platform: GITHUB | LEETCODE | etc.
  */
 router.get('/:platform/status', authenticate, platformsController.getPlatformStatus);
+
+/**
+ * @route   GET /api/v1/platforms/openproject/projects
+ * @desc    Get all OpenProject projects
+ * @access  Private
+ */
+router.get('/openproject/projects', authenticate, platformsController.getOpenProjectProjects);
+
+/**
+ * @route   GET /api/v1/platforms/openproject/projects/:projectId/work-packages
+ * @desc    Get work packages for a specific OpenProject project
+ * @access  Private
+ * @param   projectId: OpenProject project ID or identifier
+ */
+router.get('/openproject/projects/:projectId/work-packages', authenticate, platformsController.getProjectWorkPackages);
 
 export default router;
