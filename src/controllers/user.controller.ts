@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { BaseController } from '../utils/base-controller';
 import prisma from '../config/database';
 import { ResponseHandler } from '../utils/response';
@@ -288,5 +288,34 @@ export class UserController extends BaseController {
     });
 
     return ResponseHandler.success(res, tasks, 'Tasks retrieved successfully');
+  };
+
+  /**
+   * POST /api/v1/users/tasks
+   * Create a new manual task
+   */
+  createTask = async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.id!;
+    const { title, description, priority, dueDate } = req.body;
+
+    // Validate required fields
+    if (!title || title.trim().length === 0) {
+      return ResponseHandler.error(res, 'Task title is required', 400);
+    }
+
+    // Create the task
+    const task = await prisma.task.create({
+      data: {
+        userId,
+        title: title.trim(),
+        description: description?.trim() || null,
+        priority: priority || 'MEDIUM',
+        dueDate: dueDate ? new Date(dueDate) : null,
+        source: 'MANUAL',
+        status: 'TODO',
+      },
+    });
+
+    return ResponseHandler.success(res, task, 'Task created successfully', 201);
   };
 }
