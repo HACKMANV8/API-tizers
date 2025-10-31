@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 import 'express-async-errors';
+import passport from './auth/google.strategy';
 
 import { config } from './config';
 import { stream } from './utils/logger';
@@ -33,6 +34,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Compression middleware
 app.use(compression());
+
+// Passport initialization
+app.use(passport.initialize());
 
 // Logging middleware
 if (config.nodeEnv !== 'test') {

@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/auth.service';
 import { BaseController } from '../utils/base-controller';
 import prisma from '../config/database';
+import { JwtService } from '../auth/jwt.service';
+import { User } from '@prisma/client';
 
 export class AuthController extends BaseController {
   private authService: AuthService;
@@ -147,5 +149,33 @@ export class AuthController extends BaseController {
 
       this.success(res, profile, 'Profile retrieved successfully');
     });
+  };
+
+  /**
+   * GET /api/auth/google/callback
+   * Handle Google OAuth callback
+   */
+  googleCallback = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      // User is attached to req by passport
+      const user = req.user as User;
+
+      if (!user) {
+        return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth?error=google_auth_failed`);
+      }
+
+      // Generate JWT tokens for the user
+      const tokens = JwtService.generateTokenPair({
+        userId: user.id,
+        email: user.email,
+        username: user.username || user.email.split('@')[0],
+      });
+
+      // Redirect to frontend with tokens
+      const redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}`;
+      res.redirect(redirectUrl);
+    } catch (error) {
+      next(error);
+    }
   };
 }
