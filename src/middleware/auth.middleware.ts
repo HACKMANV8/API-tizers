@@ -16,6 +16,15 @@ declare global {
   }
 }
 
+// Export AuthRequest type for use in controllers
+export interface AuthRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    username: string;
+  };
+}
+
 /**
  * Middleware to verify JWT token and attach user to request
  */

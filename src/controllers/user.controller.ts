@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { BaseController } from '../utils/base-controller';
-import { prisma } from '../config/database';
+import prisma from '../config/database';
 import { ResponseHandler } from '../utils/response';
 import { NotFoundError } from '../utils/errors';
 import { AuthRequest } from '../middleware/auth.middleware';
@@ -15,7 +15,7 @@ export class UserController extends BaseController {
    * Get user's recent activity feed
    */
   getActivity = async (req: AuthRequest, res: Response) => {
-    const userId = req.user?.userId!;
+    const userId = req.user?.id!;
     const limit = parseInt(req.query.limit as string) || 20;
 
     // Fetch recent activities from various sources
@@ -142,7 +142,7 @@ export class UserController extends BaseController {
    * Get user's overall stats (level, XP, rank, badge)
    */
   getStats = async (req: AuthRequest, res: Response) => {
-    const userId = req.user?.userId!;
+    const userId = req.user?.id!;
 
     // Get user basic info
     const user = await prisma.user.findUnique({
@@ -213,7 +213,7 @@ export class UserController extends BaseController {
    * Get user's connected platforms status
    */
   getPlatforms = async (req: AuthRequest, res: Response) => {
-    const userId = req.user?.userId!;
+    const userId = req.user?.id!;
 
     // Get all platform connections for the user
     const connections = await prisma.platformConnection.findMany({
@@ -253,5 +253,32 @@ export class UserController extends BaseController {
     });
 
     return ResponseHandler.success(res, platformStatus, 'Platform status retrieved successfully');
+  };
+
+  /**
+   * GET /api/v1/users/tasks
+   * Get user's tasks from all sources
+   */
+  getTasks = async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.id!;
+    const source = req.query.source as string;
+    const status = req.query.status as string;
+
+    const where: any = { userId };
+
+    if (source) {
+      where.source = source;
+    }
+
+    if (status) {
+      where.status = status;
+    }
+
+    const tasks = await prisma.task.findMany({
+      where,
+      orderBy: { dueDate: 'asc' },
+    });
+
+    return ResponseHandler.success(res, tasks, 'Tasks retrieved successfully');
   };
 }

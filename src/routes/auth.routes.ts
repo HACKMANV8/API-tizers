@@ -11,6 +11,7 @@ import {
   resetPasswordValidator,
   changePasswordValidator,
 } from '../validators/auth.validator';
+import passport from '../auth/google.strategy';
 
 const router = Router();
 const authController = new AuthController();
@@ -111,5 +112,31 @@ router.post(
  * @access  Private
  */
 router.get('/profile', authenticate, authController.getProfile);
+
+/**
+ * @route   GET /api/auth/google
+ * @desc    Initiate Google OAuth flow
+ * @access  Public
+ */
+router.get(
+  '/google',
+  passport.authenticate('google', {
+    session: false,
+  })
+);
+
+/**
+ * @route   GET /api/auth/google/callback
+ * @desc    Google OAuth callback
+ * @access  Public
+ */
+router.get(
+  '/google/callback',
+  passport.authenticate('google', {
+    session: false,
+    failureRedirect: '/auth?error=google_auth_failed',
+  }),
+  authController.googleCallback
+);
 
 export default router;

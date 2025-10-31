@@ -27,4 +27,12 @@ router.get('/stats', authenticate, userController.getStats);
  */
 router.get('/platforms', authenticate, userController.getPlatforms);
 
+/**
+ * @route   GET /api/v1/users/tasks
+ * @desc    Get user's tasks from all sources
+ * @access  Private
+ * @query   source: string (optional), status: string (optional)
+ */
+router.get('/tasks', authenticate, userController.getTasks);
+
 export default router;

@@ -14,7 +14,9 @@ datasource db {
 model User {
   id             String   @id @default(uuid())
   email          String   @unique
-  username       String   @unique
+  username       String?  @unique
+  name           String?
+  avatar         String?
   passwordHash   String?  @map("password_hash")
   fullName       String?  @map("full_name")
   avatarUrl      String?  @map("avatar_url")
@@ -133,6 +135,7 @@ model Task {
   userId         String       @map("user_id")
   source         TaskSource
   sourceId       String?      @map("source_id")
+  externalId     String?      @map("external_id") // External platform ID (e.g., Google Calendar event ID)
   title          String
   description    String?
   status         TaskStatus   @default(TODO)
@@ -153,6 +156,7 @@ model Task {
 
   @@index([userId, status])
   @@index([userId, dueDate])
+  @@index([userId, source, externalId])
   @@map("tasks")
 }
 

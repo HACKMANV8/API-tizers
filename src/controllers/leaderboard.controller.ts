@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { BaseController } from '../utils/base-controller';
 import { LeaderboardService } from '../services/leaderboard/leaderboard.service';
-import { prisma } from '../config/database';
+import prisma from '../config/database';
 import { ResponseHandler } from '../utils/response';
 import { BadRequestError } from '../utils/errors';
 
