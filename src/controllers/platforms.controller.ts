@@ -75,6 +75,20 @@ export class PlatformsController extends BaseController {
       });
     }
 
+    // Trigger immediate sync for Codeforces to fetch initial stats
+    if (platform.toUpperCase() === 'CODEFORCES') {
+      try {
+        const { CodeforcesIntegration } = require('../integrations/codeforces.integration');
+        const codeforcesIntegration = new CodeforcesIntegration(prisma);
+        // Sync in background - don't await to avoid blocking response
+        codeforcesIntegration.syncData(userId, connection.id).catch((error) => {
+          console.error('[Codeforces] Initial sync failed:', error);
+        });
+      } catch (error) {
+        console.error('[Codeforces] Failed to trigger initial sync:', error);
+      }
+    }
+
     return ResponseHandler.success(
       res,
       {
@@ -326,42 +340,27 @@ export class PlatformsController extends BaseController {
       throw new NotFoundError('Codeforces connection not found');
     }
 
-    // Get the latest stats from database
-    const stats = await prisma.cpStat.findFirst({
-      where: {
-        connectionId,
-        platform: 'CODEFORCES',
-      },
-      orderBy: {
-        date: 'desc',
-      },
-    });
+    // Always trigger a fresh sync to get latest data
+    const { CodeforcesIntegration } = require('../integrations/codeforces.integration');
+    const codeforcesIntegration = new CodeforcesIntegration(prisma);
 
-    if (!stats) {
-      // No stats yet, trigger a sync
-      const { CodeforcesIntegration } = require('../integrations/codeforces.integration');
-      const codeforcesIntegration = new CodeforcesIntegration(prisma);
+    try {
+      await codeforcesIntegration.syncData(userId, connectionId);
 
-      try {
-        await codeforcesIntegration.syncData(userId, connectionId);
+      // Fetch the newly synced stats
+      const stats = await prisma.cpStat.findFirst({
+        where: {
+          connectionId,
+          platform: 'CODEFORCES',
+        },
+        orderBy: {
+          date: 'desc',
+        },
+      });
 
-        // Fetch the newly created stats
-        const newStats = await prisma.cpStat.findFirst({
-          where: {
-            connectionId,
-            platform: 'CODEFORCES',
-          },
-          orderBy: {
-            date: 'desc',
-          },
-        });
-
-        this.success(res, newStats, 'Codeforces stats fetched successfully');
-      } catch (error: any) {
-        this.error(res, 'Failed to sync Codeforces data', 500);
-      }
-    } else {
       this.success(res, stats, 'Codeforces stats fetched successfully');
+    } catch (error: any) {
+      throw new ServiceUnavailableError('Failed to sync Codeforces data');
     }
   };
 

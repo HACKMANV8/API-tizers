@@ -186,13 +186,7 @@ export class CodeforcesIntegration extends BaseIntegration {
       const todayStart = startOfDay(new Date());
       const stats = this.calculateStats(submissions, todayStart);
 
-      // Count contests participated today
-      const todayContests = contests.filter((contest) => {
-        const contestDate = new Date(contest.ratingUpdateTimeSeconds * 1000);
-        return contestDate >= todayStart;
-      });
-
-      // Upsert Codeforces stats
+      // Upsert Codeforces stats - Store ALL-TIME stats
       await this.prisma.cpStat.upsert({
         where: {
           connectionId_date: {
@@ -205,11 +199,11 @@ export class CodeforcesIntegration extends BaseIntegration {
           userId,
           platform: 'CODEFORCES',
           date: todayStart,
-          problemsSolved: stats.solvedToday,
-          easySolved: 0, // Today's breakdown not calculated
-          mediumSolved: 0,
-          hardSolved: 0,
-          contestsParticipated: todayContests.length,
+          problemsSolved: stats.totalSolved, // All-time total
+          easySolved: stats.difficultyBreakdown.easy, // All-time easy
+          mediumSolved: stats.difficultyBreakdown.medium, // All-time medium
+          hardSolved: stats.difficultyBreakdown.hard, // All-time hard
+          contestsParticipated: contests.length, // All-time contests
           rating: userData.rating,
           ranking: 0, // Codeforces doesn't provide direct ranking
           totalProblemsSolved: stats.totalSolved,
@@ -225,8 +219,11 @@ export class CodeforcesIntegration extends BaseIntegration {
           },
         },
         update: {
-          problemsSolved: stats.solvedToday,
-          contestsParticipated: todayContests.length,
+          problemsSolved: stats.totalSolved, // All-time total
+          easySolved: stats.difficultyBreakdown.easy, // All-time easy
+          mediumSolved: stats.difficultyBreakdown.medium, // All-time medium
+          hardSolved: stats.difficultyBreakdown.hard, // All-time hard
+          contestsParticipated: contests.length, // All-time contests
           rating: userData.rating,
           totalProblemsSolved: stats.totalSolved,
           problemsDetail: {
