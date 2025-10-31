@@ -16,6 +16,7 @@ const Connections = () => {
   const [showKey, setShowKey] = useState(false);
   const [leetcodeUsername, setLeetcodeUsername] = useState("");
   const [leetcodeKey, setLeetcodeKey] = useState("");
+  const [codeforcesUsername, setCodeforcesUsername] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -117,6 +118,43 @@ const Connections = () => {
       toast({
         title: "Connection Failed",
         description: error.response?.data?.message || "Failed to connect to LeetCode",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleCodeforcesConnect = async () => {
+    if (!codeforcesUsername) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter your Codeforces username",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading('CODEFORCES');
+    try {
+      await platformsApi.connectPlatform('codeforces', {
+        username: codeforcesUsername,
+      });
+
+      toast({
+        title: "Connected!",
+        description: "Successfully connected to Codeforces",
+      });
+
+      // Refresh platforms data
+      queryClient.invalidateQueries({ queryKey: ['userPlatforms'] });
+
+      // Clear form
+      setCodeforcesUsername("");
+    } catch (error: any) {
+      toast({
+        title: "Connection Failed",
+        description: error.response?.data?.message || "Failed to connect to Codeforces",
         variant: "destructive",
       });
     } finally {
@@ -366,17 +404,61 @@ const Connections = () => {
                       )}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Connect your Codeforces account to track competitive programming progress
-                    </p>
-                    <Button
-                      className="w-full"
-                      variant="outline"
-                      disabled
-                    >
-                      Coming Soon
-                    </Button>
+                  <CardContent className="space-y-4">
+                    {getPlatformByName('Codeforces')?.connected ? (
+                      <>
+                        <p className="text-sm text-muted-foreground">
+                          Connected as: <span className="text-foreground">{getPlatformByName('Codeforces')?.connections?.[0]?.platformUsername}</span>
+                        </p>
+                        <Button
+                          variant="destructive"
+                          className="w-full"
+                          onClick={() => handleDisconnect('CODEFORCES', getPlatformByName('Codeforces')?.connections?.[0]?.id)}
+                          disabled={loading === `CODEFORCES-${getPlatformByName('Codeforces')?.connections?.[0]?.id}`}
+                        >
+                          {loading === `CODEFORCES-${getPlatformByName('Codeforces')?.connections?.[0]?.id}` ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Disconnecting...
+                            </>
+                          ) : (
+                            'Disconnect'
+                          )}
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Connect your Codeforces account to track competitive programming progress
+                        </p>
+                        <div className="space-y-2">
+                          <Label htmlFor="codeforces-username" className="text-sm">Username</Label>
+                          <Input
+                            id="codeforces-username"
+                            type="text"
+                            placeholder="Your Codeforces handle (e.g., tourist)"
+                            className="bg-surface/50 border-border focus:border-cyan"
+                            value={codeforcesUsername}
+                            onChange={(e) => setCodeforcesUsername(e.target.value)}
+                          />
+                        </div>
+
+                        <Button
+                          className="w-full btn-gradient text-background font-semibold"
+                          onClick={handleCodeforcesConnect}
+                          disabled={loading === 'CODEFORCES'}
+                        >
+                          {loading === 'CODEFORCES' ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Connecting...
+                            </>
+                          ) : (
+                            'Connect'
+                          )}
+                        </Button>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               </div>

@@ -67,4 +67,21 @@ router.get('/github/repos/:connectionId', authenticate, platformsController.getG
  */
 router.get('/github/commits/:connectionId', authenticate, platformsController.getGitHubCommits);
 
+/**
+ * @route   GET /api/v1/platforms/codeforces/stats/:connectionId
+ * @desc    Get Codeforces stats for a connected account
+ * @access  Private
+ * @param   connectionId: Platform connection ID
+ */
+router.get('/codeforces/stats/:connectionId', authenticate, platformsController.getCodeforcesStats);
+
+/**
+ * @route   GET /api/v1/platforms/codeforces/submissions/:connectionId
+ * @desc    Get recent submissions for a Codeforces account
+ * @access  Private
+ * @param   connectionId: Platform connection ID
+ * @query   count: Number of submissions to fetch (optional, default 100)
+ */
+router.get('/codeforces/submissions/:connectionId', authenticate, platformsController.getCodeforcesSubmissions);
+
 export default router;

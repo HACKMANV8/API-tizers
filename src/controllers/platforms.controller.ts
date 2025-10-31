@@ -15,7 +15,7 @@ export class PlatformsController extends BaseController {
    * Connect a platform account
    */
   connectPlatform = async (req: AuthRequest, res: Response) => {
-    const userId = req.user?.userId!;
+    const userId = req.user!.id;
     const { platform } = req.params;
     const { username, accessToken, platformUserId } = req.body;
 
@@ -81,7 +81,7 @@ export class PlatformsController extends BaseController {
    * Disconnect a platform account
    */
   disconnectPlatform = async (req: AuthRequest, res: Response) => {
-    const userId = req.user?.userId!;
+    const userId = req.user!.id;
     const { platform } = req.params;
     const { connectionId } = req.query; // Optional: for disconnecting specific connection
 
@@ -136,7 +136,7 @@ export class PlatformsController extends BaseController {
    * Manually trigger sync for a specific platform
    */
   syncPlatform = async (req: AuthRequest, res: Response) => {
-    const userId = req.user?.userId!;
+    const userId = req.user!.id;
     const { platform } = req.params;
 
     // Find active connection
@@ -179,7 +179,7 @@ export class PlatformsController extends BaseController {
    * Get detailed status of a specific platform connection
    */
   getPlatformStatus = async (req: AuthRequest, res: Response) => {
-    const userId = req.user?.userId!;
+    const userId = req.user!.id;
     const { platform } = req.params;
 
     const connection = await prisma.platformConnection.findFirst({
@@ -226,7 +226,7 @@ export class PlatformsController extends BaseController {
    * Get GitHub repositories for a connected account
    */
   getGitHubRepositories = async (req: AuthRequest, res: Response) => {
-    const userId = req.user!.userId;
+    const userId = req.user!.id;
     const { connectionId } = req.params;
 
     // Verify the connection belongs to the user
@@ -257,7 +257,7 @@ export class PlatformsController extends BaseController {
    * Query params: repo (required), since (optional), until (optional)
    */
   getGitHubCommits = async (req: AuthRequest, res: Response) => {
-    const userId = req.user!.userId;
+    const userId = req.user!.id;
     const { connectionId } = req.params;
     const { repo, since, until } = req.query;
 
@@ -290,5 +290,101 @@ export class PlatformsController extends BaseController {
     );
 
     this.success(res, commits, 'Repository commits fetched successfully');
+  };
+
+  /**
+   * GET /api/platforms/codeforces/stats/:connectionId
+   * Get Codeforces stats for a connected account
+   */
+  getCodeforcesStats = async (req: Request, res: Response) => {
+    const userId = (req as any).user!.id;
+    const { connectionId } = req.params;
+
+    // Verify the connection belongs to the user
+    const connection = await prisma.platformConnection.findFirst({
+      where: {
+        id: connectionId,
+        userId,
+        platform: 'CODEFORCES',
+        isActive: true,
+      },
+    });
+
+    if (!connection) {
+      throw new NotFoundError('Codeforces connection not found');
+    }
+
+    // Get the latest stats from database
+    const stats = await prisma.cpStat.findFirst({
+      where: {
+        connectionId,
+        platform: 'CODEFORCES',
+      },
+      orderBy: {
+        date: 'desc',
+      },
+    });
+
+    if (!stats) {
+      // No stats yet, trigger a sync
+      const { CodeforcesIntegration } = require('../integrations/codeforces.integration');
+      const codeforcesIntegration = new CodeforcesIntegration(prisma);
+
+      try {
+        await codeforcesIntegration.syncData(userId, connectionId);
+
+        // Fetch the newly created stats
+        const newStats = await prisma.cpStat.findFirst({
+          where: {
+            connectionId,
+            platform: 'CODEFORCES',
+          },
+          orderBy: {
+            date: 'desc',
+          },
+        });
+
+        this.success(res, newStats, 'Codeforces stats fetched successfully');
+      } catch (error: any) {
+        this.error(res, 'Failed to sync Codeforces data', 500);
+      }
+    } else {
+      this.success(res, stats, 'Codeforces stats fetched successfully');
+    }
+  };
+
+  /**
+   * GET /api/platforms/codeforces/submissions/:connectionId
+   * Get recent submissions for a Codeforces account
+   * Query params: count (optional, default 100)
+   */
+  getCodeforcesSubmissions = async (req: Request, res: Response) => {
+    const userId = (req as any).user!.id;
+    const { connectionId } = req.params;
+    const { count } = req.query;
+
+    // Verify the connection belongs to the user
+    const connection = await prisma.platformConnection.findFirst({
+      where: {
+        id: connectionId,
+        userId,
+        platform: 'CODEFORCES',
+        isActive: true,
+      },
+    });
+
+    if (!connection) {
+      throw new NotFoundError('Codeforces connection not found');
+    }
+
+    const { CodeforcesIntegration } = require('../integrations/codeforces.integration');
+    const codeforcesIntegration = new CodeforcesIntegration(prisma);
+
+    const submissions = await codeforcesIntegration.fetchSubmissions(
+      connection.platformUsername,
+      count ? parseInt(count as string, 10) : 100
+    );
+
+    this.success(res, submissions, 'Codeforces submissions fetched successfully');
   };
 }

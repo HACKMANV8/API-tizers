@@ -168,6 +168,15 @@ export const platformsApi = {
     api.get<ApiResponse>(`/platforms/github/commits/${connectionId}`, {
       params: { repo, since, until },
     }),
+
+  // Codeforces-specific methods
+  getCodeforcesStats: (connectionId: string) =>
+    api.get<ApiResponse>(`/platforms/codeforces/stats/${connectionId}`),
+
+  getCodeforcesSubmissions: (connectionId: string, count?: number) =>
+    api.get<ApiResponse>(`/platforms/codeforces/submissions/${connectionId}`, {
+      params: { count },
+    }),
 };
 
 export default api;
