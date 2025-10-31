@@ -200,7 +200,7 @@ const Connections = () => {
                         className="flex items-center justify-between p-3 bg-surface-light/50 border border-border/30 rounded-lg"
                       >
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-foreground">@{conn.username}</p>
+                          <p className="text-sm font-medium text-foreground">@{conn.platformUsername}</p>
                           {conn.lastSynced && (
                             <p className="text-xs text-muted-foreground mt-1">
                               Last synced: {new Date(conn.lastSynced).toLocaleDateString()}
@@ -210,7 +210,7 @@ const Connections = () => {
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={() => handleDisconnect('GITHUB', conn.id, conn.username)}
+                          onClick={() => handleDisconnect('GITHUB', conn.id, conn.platformUsername)}
                           disabled={loading === `GITHUB-${conn.id}`}
                         >
                           {loading === `GITHUB-${conn.id}` ? (
