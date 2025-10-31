@@ -211,6 +211,102 @@ export class GitHubIntegration extends BaseIntegration {
   /**
    * Get user's language statistics
    */
+  /**
+   * Fetch user repositories from GitHub
+   */
+  async fetchRepositories(connectionId: string): Promise<any[]> {
+    const connection = await this.prisma.platformConnection.findUnique({
+      where: { id: connectionId },
+    });
+
+    if (!connection || !connection.accessToken) {
+      throw new NotFoundError('GitHub connection not found');
+    }
+
+    try {
+      const repos = await this.authenticatedRequest<any[]>(
+        {
+          method: 'GET',
+          url: '/user/repos',
+          params: {
+            sort: 'updated',
+            per_page: 100,
+          },
+        },
+        connection.accessToken
+      );
+
+      return repos.map((repo: any) => ({
+        id: repo.id,
+        name: repo.name,
+        fullName: repo.full_name,
+        private: repo.private,
+        description: repo.description,
+        htmlUrl: repo.html_url,
+        language: repo.language,
+        stargazersCount: repo.stargazers_count,
+        forksCount: repo.forks_count,
+        openIssuesCount: repo.open_issues_count,
+        updatedAt: repo.updated_at,
+        pushedAt: repo.pushed_at,
+      }));
+    } catch (error: any) {
+      this.logger.error('[GitHub] Error fetching repositories:', error);
+      throw new ServiceUnavailableError('Failed to fetch GitHub repositories');
+    }
+  }
+
+  /**
+   * Fetch commits for a specific repository
+   */
+  async fetchRepositoryCommits(
+    connectionId: string,
+    repoFullName: string,
+    since?: string,
+    until?: string
+  ): Promise<any[]> {
+    const connection = await this.prisma.platformConnection.findUnique({
+      where: { id: connectionId },
+    });
+
+    if (!connection || !connection.accessToken) {
+      throw new NotFoundError('GitHub connection not found');
+    }
+
+    try {
+      const params: any = {
+        per_page: 100,
+      };
+      if (since) params.since = since;
+      if (until) params.until = until;
+
+      const commits = await this.authenticatedRequest<any[]>(
+        {
+          method: 'GET',
+          url: `/repos/${repoFullName}/commits`,
+          params,
+        },
+        connection.accessToken
+      );
+
+      return commits.map((commit: any) => ({
+        sha: commit.sha,
+        message: commit.commit.message,
+        author: {
+          name: commit.commit.author.name,
+          email: commit.commit.author.email,
+          date: commit.commit.author.date,
+        },
+        committer: commit.commit.committer,
+        htmlUrl: commit.html_url,
+        stats: commit.stats,
+      }));
+    } catch (error: any) {
+      this.logger.error('[GitHub] Error fetching repository commits:', error);
+      throw new ServiceUnavailableError('Failed to fetch repository commits');
+    }
+  }
+
   async fetchLanguageStats(username: string, accessToken: string): Promise<any> {
     try {
       const repos = await this.authenticatedRequest<any[]>(

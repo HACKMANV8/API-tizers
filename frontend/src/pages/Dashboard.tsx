@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { userApi } from "@/lib/api";
 import * as LucideIcons from "lucide-react";
 import { Loader2, Search } from "lucide-react";
+import { GitHubStats } from "@/components/GitHubStats";
 
 const Dashboard = () => {
   // Fetch activity feed
@@ -37,6 +38,10 @@ const Dashboard = () => {
   const activities = activityData || [];
   const stats = statsData || { totalPoints: 0, level: 0, currentStreak: 0 };
   const platforms = platformsData || [];
+
+  // Get GitHub connections from the new data structure
+  const githubPlatform = platforms.find((p: any) => p.name === 'GitHub');
+  const githubConnections = githubPlatform?.connections || [];
 
   return (
     <DashboardLayout>
@@ -267,6 +272,13 @@ const Dashboard = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* GitHub Stats - Full width */}
+        {githubConnections.length > 0 && (
+          <div className="md:col-span-2 lg:col-span-3">
+            <GitHubStats connections={githubConnections} />
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

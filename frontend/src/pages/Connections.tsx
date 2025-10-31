@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { platformsApi, userApi } from "@/lib/api";
 
 const Connections = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showKey, setShowKey] = useState(false);
   const [leetcodeUsername, setLeetcodeUsername] = useState("");
   const [leetcodeKey, setLeetcodeKey] = useState("");
@@ -32,11 +34,58 @@ const Connections = () => {
 
   const platforms = platformsData || [];
 
+  // Handle GitHub OAuth callback
+  useEffect(() => {
+    const githubConnected = searchParams.get('github_connected');
+    const reactivated = searchParams.get('reactivated');
+    const error = searchParams.get('error');
+
+    if (githubConnected === 'true') {
+      toast({
+        title: "Connected!",
+        description: reactivated === 'true'
+          ? "Successfully reconnected your GitHub account"
+          : "Successfully connected to GitHub",
+      });
+      queryClient.invalidateQueries({ queryKey: ['userPlatforms'] });
+      // Clean up URL params
+      setSearchParams({});
+    } else if (error) {
+      let errorMessage = "Failed to connect to GitHub";
+      if (error === 'invalid_token') {
+        errorMessage = "Your session expired. Please login again.";
+      } else if (error === 'missing_token') {
+        errorMessage = "Please login before connecting GitHub.";
+      } else if (error === 'already_connected' || error === 'account_already_connected') {
+        const username = searchParams.get('username');
+        errorMessage = username
+          ? `GitHub account @${username} is already connected. To add a different account, log out of GitHub first or use a different browser/incognito mode.`
+          : "This GitHub account is already connected. To connect a different account, log out of GitHub first.";
+      }
+      toast({
+        title: "Connection Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      // Clean up URL params
+      setSearchParams({});
+    }
+  }, [searchParams, setSearchParams, queryClient, toast]);
+
   const handleGitHubConnect = () => {
-    toast({
-      title: "GitHub OAuth",
-      description: "OAuth integration coming soon. For now, please use the API to connect manually.",
-    });
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+    // Get JWT token from localStorage (stored as 'accessToken')
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast({
+        title: "Authentication Required",
+        description: "Please login first before connecting GitHub",
+        variant: "destructive",
+      });
+      return;
+    }
+    // Pass token in state parameter
+    window.location.href = `${apiBaseUrl}/auth/github?state=${encodeURIComponent(token)}`;
   };
 
   const handleLeetCodeConnect = async () => {
@@ -78,6 +127,9 @@ const Connections = () => {
     }
   };
 
+  const handleDisconnect = async (platform: string, connectionId?: string, username?: string) => {
+    const loadingKey = connectionId ? `${platform}-${connectionId}` : platform;
+    setLoading(loadingKey);
   const handleOpenProjectConnect = async () => {
     if (!openProjectUrl || !openProjectToken) {
       toast({
@@ -132,11 +184,13 @@ const Connections = () => {
   const handleDisconnect = async (platform: string) => {
     setLoading(platform);
     try {
-      await platformsApi.disconnectPlatform(platform.toLowerCase());
+      await platformsApi.disconnectPlatform(platform.toLowerCase(), connectionId);
 
       toast({
         title: "Disconnected",
-        description: `Successfully disconnected from ${platform}`,
+        description: username
+          ? `Successfully disconnected ${platform} account @${username}`
+          : `Successfully disconnected from ${platform}`,
       });
 
       // Refresh platforms data
@@ -181,7 +235,7 @@ const Connections = () => {
 
             <TabsContent value="stats" className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
-                {/* GitHub OAuth */}
+                {/* GitHub OAuth - Multiple Accounts Support */}
                 <Card className="glass-card border-border/50">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-3">
@@ -189,41 +243,80 @@ const Connections = () => {
                       <span>GitHub</span>
                       {getPlatformByName('GitHub')?.connected && (
                         <span className="ml-auto text-xs bg-green-500/20 text-green-500 px-2 py-1 rounded-full">
-                          Connected
+                          {getPlatformByName('GitHub')?.connections?.length || 0} Connected
                         </span>
                       )}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {getPlatformByName('GitHub')?.connected ? (
-                      <>
-                        <p className="text-sm text-muted-foreground">
-                          Connected as: <span className="text-foreground">{getPlatformByName('GitHub')?.username}</span>
-                        </p>
+                    {/* List all connected GitHub accounts */}
+                    {getPlatformByName('GitHub')?.connections?.map((conn: any) => (
+                      <div
+                        key={conn.id}
+                        className="flex items-center justify-between p-3 bg-surface-light/50 border border-border/30 rounded-lg"
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-foreground">@{conn.platformUsername}</p>
+                          {conn.lastSynced && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Last synced: {new Date(conn.lastSynced).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
                         <Button
                           variant="destructive"
-                          className="w-full"
-                          onClick={() => handleDisconnect('GITHUB')}
-                          disabled={loading === 'GITHUB'}
+                          size="sm"
+                          onClick={() => handleDisconnect('GITHUB', conn.id, conn.platformUsername)}
+                          disabled={loading === `GITHUB-${conn.id}`}
                         >
-                          {loading === 'GITHUB' ? (
+                          {loading === `GITHUB-${conn.id}` ? (
                             <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
                               Disconnecting...
                             </>
                           ) : (
                             'Disconnect'
                           )}
                         </Button>
-                      </>
-                    ) : (
-                      <Button
-                        className="w-full btn-gradient text-background font-semibold"
-                        onClick={handleGitHubConnect}
-                      >
-                        Connect via OAuth
-                      </Button>
+                      </div>
+                    ))}
+
+                    {/* Instructions for adding multiple accounts */}
+                    {getPlatformByName('GitHub')?.connections?.length > 0 && (
+                      <div className="text-xs bg-surface-light/30 border border-border/30 p-3 rounded-lg space-y-2">
+                        <p className="font-medium text-foreground flex items-center gap-2">
+                          <span className="text-cyan">💡</span>
+                          To add a different GitHub account:
+                        </p>
+                        <ol className="list-decimal list-inside space-y-1 ml-2 text-muted-foreground">
+                          <li>
+                            <a
+                              href="https://github.com/logout"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-cyan hover:underline"
+                            >
+                              Log out of GitHub
+                            </a>{' '}
+                            first, then click the button below
+                          </li>
+                          <li>OR use a different browser/incognito mode</li>
+                        </ol>
+                        <p className="text-xs opacity-75 text-muted-foreground mt-2">
+                          GitHub will automatically use your currently logged-in account.
+                        </p>
+                      </div>
                     )}
+
+                    {/* Always show "Add Account" button */}
+                    <Button
+                      className="w-full btn-gradient text-background font-semibold"
+                      onClick={handleGitHubConnect}
+                    >
+                      {getPlatformByName('GitHub')?.connections?.length > 0
+                        ? '+ Add Another GitHub Account'
+                        : 'Connect via OAuth'}
+                    </Button>
                   </CardContent>
                 </Card>
 

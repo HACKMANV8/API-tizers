@@ -219,6 +219,7 @@ export class UserController extends BaseController {
     const connections = await prisma.platformConnection.findMany({
       where: { userId },
       select: {
+        id: true,
         platform: true,
         platformUsername: true,
         isActive: true,
@@ -240,15 +241,22 @@ export class UserController extends BaseController {
 
     // Map connections to platform status
     const platformStatus = allPlatforms.map((plat) => {
-      const connection = connections.find((conn) => conn.platform === plat.platform);
+      // Find ALL connections for this platform (supports multiple accounts per platform)
+      const platformConnections = connections.filter(
+        (conn) => conn.platform === plat.platform && conn.isActive
+      );
+
       return {
         platform: plat.platform,
         name: plat.name,
         icon: plat.icon,
-        connected: !!connection && connection.isActive,
-        username: connection?.platformUsername || null,
-        lastSynced: connection?.lastSynced || null,
-        syncStatus: connection?.syncStatus || null,
+        connected: platformConnections.length > 0,
+        connections: platformConnections.map((conn) => ({
+          id: conn.id,
+          platformUsername: conn.platformUsername,
+          lastSynced: conn.lastSynced,
+          syncStatus: conn.syncStatus,
+        })),
       };
     });
 

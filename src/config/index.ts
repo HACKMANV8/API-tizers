@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 
-dotenv.config();
+dotenv.config({ override: true });
 
 export const config = {
   // Server
@@ -97,7 +97,7 @@ export const config = {
 
   // CORS
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: process.env.CORS_ORIGIN || 'http://localhost:8080',
     credentials: process.env.CORS_CREDENTIALS === 'true',
   },
 

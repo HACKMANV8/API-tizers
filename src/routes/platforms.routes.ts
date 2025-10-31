@@ -52,6 +52,21 @@ router.put('/sync/:platform', authenticate, platformsController.syncPlatform);
 router.get('/:platform/status', authenticate, platformsController.getPlatformStatus);
 
 /**
+ * @route   GET /api/v1/platforms/github/repos/:connectionId
+ * @desc    Get GitHub repositories for a connected account
+ * @access  Private
+ * @param   connectionId: Platform connection ID
+ */
+router.get('/github/repos/:connectionId', authenticate, platformsController.getGitHubRepositories);
+
+/**
+ * @route   GET /api/v1/platforms/github/commits/:connectionId
+ * @desc    Get commits for a specific GitHub repository
+ * @access  Private
+ * @param   connectionId: Platform connection ID
+ * @query   repo: Repository full name (owner/repo), since: ISO date, until: ISO date
+ */
+router.get('/github/commits/:connectionId', authenticate, platformsController.getGitHubCommits);
  * @route   GET /api/v1/platforms/openproject/projects
  * @desc    Get all OpenProject projects
  * @access  Private
