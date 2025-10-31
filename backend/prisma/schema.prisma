@@ -1,0 +1,202 @@
+// Prism Database Schema
+// This schema defines all models for the Prism developer productivity platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model - Core authentication and user data
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  username  String   @unique
+  password  String   // Hashed with bcrypt
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  accounts          UserAccount[]
+  projects          Project[]
+  streaks           Streak[]
+  leaderboardCache  LeaderboardCache[]
+  tasks             Task[]
+  integrations      Integration[]
+
+  @@index([email])
+  @@index([username])
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+// UserAccount - Links users to external platform accounts
+model UserAccount {
+  id        String   @id @default(uuid())
+  userId    String
+  platform  Platform
+  accountId String   // Platform-specific account identifier
+  config    Json?    // Platform-specific configuration (tokens, settings, etc.)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapshots PlatformSnapshot[]
+
+  @@unique([userId, platform])
+  @@index([userId])
+  @@index([platform])
+}
+
+enum Platform {
+  LEETCODE
+  CODEFORCES
+  CODECHEF
+  ATCODER
+  GITHUB
+}
+
+// PlatformSnapshot - Stores periodic snapshots of user metrics from platforms
+model PlatformSnapshot {
+  id            String   @id @default(uuid())
+  userAccountId String
+  recordedAt    DateTime @default(now())
+  metrics       Json     // Raw metrics data from platform (problems solved, rating, etc.)
+  metricScore   Float?   // Normalized score (0-100) for leaderboard ranking
+  createdAt     DateTime @default(now())
+
+  // Relations
+  userAccount UserAccount @relation(fields: [userAccountId], references: [id], onDelete: Cascade)
+
+  @@index([userAccountId])
+  @@index([recordedAt])
+  @@index([metricScore])
+}
+
+// Project - User's deployment projects
+model Project {
+  id          String   @id @default(uuid())
+  userId      String
+  name        String
+  description String?
+  status      String   @default("active") // active, archived, deleted
+  config      Json?    // Project configuration
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deployRequests DeployRequest[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+// Template - Reusable project templates
+model Template {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  config      Json     // Template configuration (tech stack, boilerplate, etc.)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+}
+
+// DeployRequest - Deployment requests for projects
+model DeployRequest {
+  id        String   @id @default(uuid())
+  projectId String
+  status    String   @default("pending") // pending, in_progress, completed, failed
+  config    Json?    // Deployment configuration
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Streak - Tracks user activity streaks
+model Streak {
+  id           String   @id @default(uuid())
+  userId       String
+  date         DateTime @db.Date // Activity date (no time component)
+  activityType String   // Type of activity (coding, submission, etc.)
+  metadata     Json?    // Additional activity metadata
+  createdAt    DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date, activityType])
+  @@index([userId])
+  @@index([date])
+}
+
+// LeaderboardCache - Cached leaderboard rankings
+model LeaderboardCache {
+  id         String    @id @default(uuid())
+  userId     String
+  platform   Platform?
+  rank       Int
+  score      Float
+  computedAt DateTime  @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform])
+  @@index([platform])
+  @@index([rank])
+  @@index([computedAt])
+}
+
+// Task - User tasks and reminders
+model Task {
+  id          String    @id @default(uuid())
+  userId      String
+  title       String
+  description String?
+  status      String    @default("pending") // pending, in_progress, completed, cancelled
+  dueDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+// Integration - External service integrations
+model Integration {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // github, gitlab, notion, slack, etc.
+  config    Json     // Integration-specific configuration (API keys, webhooks, etc.)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId])
+  @@index([type])
+}
