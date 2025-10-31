@@ -13,6 +13,7 @@ import Leaderboard from "./pages/Leaderboard";
 import Connections from "./pages/Connections";
 import Analytics from "./pages/Analytics";
 import Tasks from "./pages/Tasks";
+import Projects from "./pages/Projects";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
               <Route path="/connections" element={<Connections />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/tasks" element={<Tasks />} />
+              <Route path="/projects" element={<Projects />} />
             </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
