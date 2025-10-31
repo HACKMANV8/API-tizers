@@ -10,7 +10,6 @@ import redis, { CACHE_KEYS } from '../redis';
 import { validateAdminKey } from '../auth/middleware';
 import logger from '../utils/logger';
 import {
-  aggregateScores,
   rankUsers,
   extractMetricValue,
   normalizeMetric,
@@ -115,7 +114,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
  * TODO: Consider time-weighted scoring (recent activity counts more)
  * TODO: Handle edge cases (users with no snapshots, tied scores)
  */
-router.post('/compute', validateAdminKey, async (req: Request, res: Response): Promise<void> => {
+router.post('/compute', validateAdminKey, async (_req: Request, res: Response): Promise<void> => {
   try {
     logger.info('Starting leaderboard computation...');
 

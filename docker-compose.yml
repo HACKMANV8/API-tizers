@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: prism_password
       POSTGRES_DB: prism_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -24,7 +24,7 @@ services:
     container_name: prism-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -53,7 +53,7 @@ services:
       LEADERBOARD_DEFAULT_LIMIT: "50"
       LOG_LEVEL: info
     ports:
-      - "3000:3000"
+      - "3002:3000"
     depends_on:
       db:
         condition: service_healthy
@@ -80,7 +80,7 @@ services:
     depends_on:
       - backend
     environment:
-      - VITE_API_URL=http://localhost:3000/api
+      - VITE_API_URL=http://localhost:3002/api
 
 volumes:
   postgres_data:

@@ -217,7 +217,7 @@ router.post(
  * TODO: Add template categories and filtering
  * TODO: Add template preview/demo links
  */
-router.get('/templates/list', async (req: Request, res: Response): Promise<void> => {
+router.get('/templates/list', async (_req: Request, res: Response): Promise<void> => {
   try {
     const templates = await prisma.template.findMany({
       orderBy: { createdAt: 'desc' },
