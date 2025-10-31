@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, User, Mail, Lock, Loader2 } from "lucide-react";
+import { FcGoogle } from "react-icons/fc";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -164,6 +165,27 @@ const Auth = () => {
                   ) : (
                     isLogin ? "Log In" : "Sign Up"
                   )}
+                </Button>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-surface px-2 text-muted-foreground">Or continue with</span>
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-11 bg-surface/50 border-border hover:bg-surface hover:border-cyan transition-colors"
+                  onClick={() => {
+                    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/v1/auth/google`;
+                  }}
+                >
+                  <FcGoogle className="mr-2 h-5 w-5" />
+                  Continue with Google
                 </Button>
 
                 <div className="text-center text-sm text-muted-foreground">

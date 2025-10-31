@@ -16,6 +16,7 @@ interface AuthContextType {
   login: (emailOrUsername: string, password: string) => Promise<void>;
   register: (email: string, username: string, password: string, fullName?: string) => Promise<void>;
   logout: () => Promise<void>;
+  setTokens: (accessToken: string, refreshToken: string) => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -147,12 +148,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     });
   };
 
+  const setTokens = async (accessToken: string, refreshToken: string) => {
+    try {
+      // Store tokens
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
+
+      // Fetch user profile
+      const response = await authApi.getProfile();
+      const userData = response.data.data;
+
+      localStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
+
+      toast({
+        title: 'Welcome!',
+        description: 'You have been successfully signed in with Google.',
+      });
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Failed to fetch user profile.';
+      toast({
+        title: 'Authentication Error',
+        description: message,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
   const value: AuthContextType = {
     user,
     loading,
     login,
     register,
     logout,
+    setTokens,
     isAuthenticated: !!user,
   };
 

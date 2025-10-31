@@ -16,6 +16,9 @@ const Connections = () => {
   const [showKey, setShowKey] = useState(false);
   const [leetcodeUsername, setLeetcodeUsername] = useState("");
   const [leetcodeKey, setLeetcodeKey] = useState("");
+  const [openProjectUrl, setOpenProjectUrl] = useState("");
+  const [openProjectToken, setOpenProjectToken] = useState("");
+  const [showOpenProjectToken, setShowOpenProjectToken] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -127,6 +130,59 @@ const Connections = () => {
   const handleDisconnect = async (platform: string, connectionId?: string, username?: string) => {
     const loadingKey = connectionId ? `${platform}-${connectionId}` : platform;
     setLoading(loadingKey);
+  const handleOpenProjectConnect = async () => {
+    if (!openProjectUrl || !openProjectToken) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter both OpenProject instance URL and API token",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate URL format
+    try {
+      new URL(openProjectUrl);
+    } catch {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid OpenProject instance URL (e.g., https://your-instance.openproject.com)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading('OPENPROJECT');
+    try {
+      await platformsApi.connectPlatform('openproject', {
+        instanceUrl: openProjectUrl,
+        accessToken: openProjectToken,
+      });
+
+      toast({
+        title: "Connected!",
+        description: "Successfully connected to OpenProject. Syncing your work packages...",
+      });
+
+      // Refresh platforms data
+      queryClient.invalidateQueries({ queryKey: ['userPlatforms'] });
+
+      // Clear form
+      setOpenProjectUrl("");
+      setOpenProjectToken("");
+    } catch (error: any) {
+      toast({
+        title: "Connection Failed",
+        description: error.response?.data?.message || "Failed to connect to OpenProject. Please check your URL and API token.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleDisconnect = async (platform: string) => {
+    setLoading(platform);
     try {
       await platformsApi.disconnectPlatform(platform.toLowerCase(), connectionId);
 
@@ -388,7 +444,7 @@ const Connections = () => {
                 <Card className="glass-card border-border/50">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-3">
-                      <Briefcase className="text-cyan" size={24} />
+                      <Briefcase className="text-amber-500" size={24} />
                       <span>OpenProject</span>
                       {getPlatformByName('OpenProject')?.connected && (
                         <span className="ml-auto text-xs bg-green-500/20 text-green-500 px-2 py-1 rounded-full">
@@ -397,14 +453,92 @@ const Connections = () => {
                       )}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <Button
-                      className="w-full"
-                      variant="outline"
-                      disabled
-                    >
-                      Coming Soon
-                    </Button>
+                  <CardContent className="space-y-4">
+                    {getPlatformByName('OpenProject')?.connected ? (
+                      <>
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">
+                            Connected as: <span className="text-foreground">{getPlatformByName('OpenProject')?.username}</span>
+                          </p>
+                          {getPlatformByName('OpenProject')?.metadata?.instanceUrl && (
+                            <p className="text-xs text-muted-foreground">
+                              Instance: <span className="text-foreground">{getPlatformByName('OpenProject')?.metadata?.instanceUrl}</span>
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          variant="destructive"
+                          className="w-full"
+                          onClick={() => handleDisconnect('OPENPROJECT')}
+                          disabled={loading === 'OPENPROJECT'}
+                        >
+                          {loading === 'OPENPROJECT' ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Disconnecting...
+                            </>
+                          ) : (
+                            'Disconnect'
+                          )}
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="openproject-url" className="text-sm">Instance URL</Label>
+                          <Input
+                            id="openproject-url"
+                            type="url"
+                            placeholder="https://your-instance.openproject.com"
+                            className="bg-surface/50 border-border focus:border-cyan"
+                            value={openProjectUrl}
+                            onChange={(e) => setOpenProjectUrl(e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Enter your OpenProject instance URL
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="openproject-token" className="text-sm">API Token (PAT)</Label>
+                          <div className="relative">
+                            <Input
+                              id="openproject-token"
+                              type={showOpenProjectToken ? "text" : "password"}
+                              placeholder="Your OpenProject Personal Access Token"
+                              className="bg-surface/50 border-border focus:border-cyan pr-10"
+                              value={openProjectToken}
+                              onChange={(e) => setOpenProjectToken(e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowOpenProjectToken(!showOpenProjectToken)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                              {showOpenProjectToken ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Create a token in Account → Access tokens
+                          </p>
+                        </div>
+
+                        <Button
+                          className="w-full btn-gradient text-background font-semibold"
+                          onClick={handleOpenProjectConnect}
+                          disabled={loading === 'OPENPROJECT'}
+                        >
+                          {loading === 'OPENPROJECT' ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Connecting...
+                            </>
+                          ) : (
+                            'Connect'
+                          )}
+                        </Button>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
 
