@@ -2,8 +2,7 @@ import { Request, Response } from 'express';
 import { BaseController } from '../utils/base-controller';
 import prisma from '../config/database';
 import { ResponseHandler } from '../utils/response';
-import { BadRequestError, NotFoundError } from '../utils/errors';
-import { AuthRequest } from '../middleware/auth.middleware';
+import { BadRequestError, NotFoundError, ServiceUnavailableError } from '../utils/errors';
 
 export class PlatformsController extends BaseController {
   constructor() {
@@ -34,34 +33,47 @@ export class PlatformsController extends BaseController {
       throw new BadRequestError(`Invalid platform. Must be one of: ${validPlatforms.join(', ')}`);
     }
 
-    // Check if THIS specific account is already connected
-    // Allow multiple accounts per platform, but not the same account twice
+    // Check if THIS specific account already exists (active or inactive)
     const existing = await prisma.platformConnection.findFirst({
       where: {
         userId,
         platform: platform.toUpperCase() as any,
         platformUsername: username,
-        isActive: true,
       },
     });
 
+    let connection;
     if (existing) {
-      throw new BadRequestError(`Account @${username} is already connected to this platform.`);
-    }
+      if (existing.isActive) {
+        throw new BadRequestError(`Account @${username} is already connected to this platform.`);
+      }
 
-    // Create platform connection
-    const connection = await prisma.platformConnection.create({
-      data: {
-        userId,
-        platform: platform.toUpperCase() as any,
-        platformUserId: platformUserId || username,
-        platformUsername: username,
-        accessToken: accessToken || '', // TODO: Encrypt in production
-        isActive: true,
-        syncStatus: 'PENDING',
-        metadata: {},
-      },
-    });
+      // Reactivate inactive connection
+      connection = await prisma.platformConnection.update({
+        where: { id: existing.id },
+        data: {
+          platformUserId: platformUserId || username,
+          accessToken: accessToken || '', // TODO: Encrypt in production
+          isActive: true,
+          syncStatus: 'PENDING',
+          metadata: {},
+        },
+      });
+    } else {
+      // Create new platform connection
+      connection = await prisma.platformConnection.create({
+        data: {
+          userId,
+          platform: platform.toUpperCase() as any,
+          platformUserId: platformUserId || username,
+          platformUsername: username,
+          accessToken: accessToken || '', // TODO: Encrypt in production
+          isActive: true,
+          syncStatus: 'PENDING',
+          metadata: {},
+        },
+      });
+    }
 
     return ResponseHandler.success(
       res,
