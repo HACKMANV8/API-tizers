@@ -3,7 +3,8 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
+package-lock.json
+yarn.lock
 
 # Environment variables
 .env
@@ -15,6 +16,14 @@ dist/
 build/
 *.tsbuildinfo
 
+# Logs
+logs/
+*.log
+
+# Testing
+coverage/
+.nyc_output/
+
 # IDE
 .vscode/
 .idea/
@@ -23,18 +32,24 @@ build/
 *~
 .DS_Store
 
-# Docker
-*.log
+# Database
+*.db
+*.sqlite
+*.sqlite3
+dump.rdb
 
 # Prisma
-backend/prisma/migrations/
+prisma/migrations/*_migration/
 
-# Testing
-coverage/
-*.test.js
-
-# Misc
-*.pem
-.cache/
-temp/
+# Temporary files
 tmp/
+temp/
+*.tmp
+
+# OS
+Thumbs.db
+.directory
+
+# Deployment
+.vercel
+.netlify
