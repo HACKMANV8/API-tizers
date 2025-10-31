@@ -32,6 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { platformsApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { AddTaskDialog } from "@/components/AddTaskDialog";
 
 const localizer = momentLocalizer(moment);
 
@@ -102,6 +103,8 @@ const getTaskColor = (source: string) => {
     return "#f59e0b"; // amber
   } else if (source === "SLACK") {
     return "#8b5cf6"; // purple
+  } else if (source === "MANUAL") {
+    return "#ec4899"; // pink
   }
   return "#3b82f6"; // default blue
 };
@@ -767,6 +770,7 @@ const Tasks = () => {
                 </>
               )}
             </Button>
+            <AddTaskDialog onTaskAdded={fetchTasks} />
           </div>
         </div>
 
@@ -869,6 +873,10 @@ const Tasks = () => {
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded bg-[#8b5cf6]" />
                   <span>Slack</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-[#ec4899]" />
+                  <span>Manual Tasks</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded bg-[#3b82f6]" />

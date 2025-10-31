@@ -35,4 +35,12 @@ router.get('/platforms', authenticate, userController.getPlatforms);
  */
 router.get('/tasks', authenticate, userController.getTasks);
 
+/**
+ * @route   POST /api/v1/users/tasks
+ * @desc    Create a new manual task
+ * @access  Private
+ * @body    title: string, description?: string, priority?: string, dueDate?: string
+ */
+router.post('/tasks', authenticate, userController.createTask);
+
 export default router;
