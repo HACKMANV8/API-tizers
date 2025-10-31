@@ -405,12 +405,87 @@ export class OpenProjectIntegration extends BaseIntegration {
   }
 
   /**
+   * Fetch a single work package by ID
+   */
+  async fetchWorkPackageById(connectionId: string, workPackageId: string): Promise<WorkPackage> {
+    const connection = await this.prisma.platformConnection.findUnique({
+      where: { id: connectionId },
+    });
+
+    if (!connection || !connection.accessToken) {
+      throw new NotFoundError('OpenProject connection not found');
+    }
+
+    // Decrypt the access token
+    const decryptedToken = encryptionService.decrypt(connection.accessToken);
+
+    // Get instance URL from metadata
+    const instanceUrl = (connection.metadata as any)?.instanceUrl;
+    if (!instanceUrl) {
+      throw new BadRequestError('OpenProject instance URL not found in connection metadata');
+    }
+
+    try {
+      const client = this.getAuthenticatedClient(instanceUrl, decryptedToken);
+
+      // Fetch single work package
+      const workPackage = await client.get<WorkPackage>(`/api/v3/work_packages/${workPackageId}`);
+
+      this.logger.info(`[OpenProject] Fetched work package ${workPackageId}`);
+
+      return workPackage;
+    } catch (error: any) {
+      this.logger.error('[OpenProject] Failed to fetch work package:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        message: error.message,
+      });
+
+      // Handle specific error cases
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        throw new BadRequestError('Invalid or expired OpenProject API token');
+      }
+
+      if (error.response?.status === 404) {
+        throw new BadRequestError('Work package not found');
+      }
+
+      if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+        throw new BadRequestError(`Cannot connect to OpenProject instance. Please check your connection.`);
+      }
+
+      // Generic error
+      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
+      throw new BadRequestError(`Failed to fetch work package: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Add a single work package to tasks with optional due date override
+   */
+  async addWorkPackageToTasks(
+    userId: string,
+    connectionId: string,
+    workPackageId: string,
+    dueDateOverride?: string
+  ): Promise<void> {
+    // Fetch the work package
+    const workPackage = await this.fetchWorkPackageById(connectionId, workPackageId);
+
+    // Convert to task with optional due date override
+    await this.convertWorkPackageToTask(workPackage, userId, connectionId, dueDateOverride);
+
+    this.logger.info(`[OpenProject] Added work package ${workPackageId} to tasks for user ${userId}`);
+  }
+
+  /**
    * Convert OpenProject work package to Task
    */
   private async convertWorkPackageToTask(
     workPackage: WorkPackage,
     userId: string,
-    connectionId: string
+    connectionId: string,
+    dueDateOverride?: string
   ): Promise<void> {
     if (!workPackage.id || !workPackage.subject) {
       return; // Skip invalid work packages
@@ -466,12 +541,17 @@ export class OpenProjectIntegration extends BaseIntegration {
       },
     });
 
+    // Use dueDateOverride if provided, otherwise use work package's dueDate
+    const effectiveDueDate = dueDateOverride
+      ? new Date(dueDateOverride)
+      : (workPackage.dueDate ? new Date(workPackage.dueDate) : null);
+
     const taskData = {
       title: workPackage.subject,
       description: workPackage.description?.raw || null,
       status,
       priority,
-      dueDate: workPackage.dueDate ? new Date(workPackage.dueDate) : null,
+      dueDate: effectiveDueDate,
       projectName: workPackage._links.project.title,
       assignee: workPackage._links.assignee?.title || null,
       estimatedHours: estimatedHours ? estimatedHours.toString() : null,

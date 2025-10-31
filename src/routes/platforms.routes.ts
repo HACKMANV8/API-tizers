@@ -66,4 +66,19 @@ router.get('/openproject/projects', authenticate, platformsController.getOpenPro
  */
 router.get('/openproject/projects/:projectId/work-packages', authenticate, platformsController.getProjectWorkPackages);
 
+/**
+ * @route   POST /api/v1/platforms/openproject/work-packages/:workPackageId/add-to-tasks
+ * @desc    Add a work package to tasks with optional due date override
+ * @access  Private
+ * @param   workPackageId: OpenProject work package ID
+ * @body    dueDate (optional): ISO date string to override work package due date
+ */
+router.post(
+  '/openproject/work-packages/:workPackageId/add-to-tasks',
+  authenticate,
+  [body('dueDate').optional().isISO8601()],
+  validate,
+  platformsController.addWorkPackageToTasks
+);
+
 export default router;

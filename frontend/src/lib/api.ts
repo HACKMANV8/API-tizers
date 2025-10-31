@@ -166,6 +166,9 @@ export const platformsApi = {
 
   getProjectWorkPackages: (projectId: string) =>
     api.get<ApiResponse>(`/platforms/openproject/projects/${projectId}/work-packages`),
+
+  addWorkPackageToTasks: (workPackageId: string, dueDate?: string) =>
+    api.post<ApiResponse>(`/platforms/openproject/work-packages/${workPackageId}/add-to-tasks`, { dueDate }),
 };
 
 export default api;

@@ -415,4 +415,48 @@ export class PlatformsController extends BaseController {
       throw new BadRequestError(`Failed to fetch work packages: ${error.message}`);
     }
   };
+
+  /**
+   * POST /api/v1/platforms/openproject/work-packages/:workPackageId/add-to-tasks
+   * Add a work package to tasks with optional due date override
+   */
+  addWorkPackageToTasks = async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.id!;
+    const { workPackageId } = req.params;
+    const { dueDate } = req.body;
+
+    // Find active OpenProject connection
+    const connection = await prisma.platformConnection.findFirst({
+      where: {
+        userId,
+        platform: 'OPENPROJECT',
+        isActive: true,
+      },
+    });
+
+    if (!connection) {
+      throw new NotFoundError('OpenProject connection not found');
+    }
+
+    try {
+      await this.openProjectIntegration.addWorkPackageToTasks(
+        userId,
+        connection.id,
+        workPackageId,
+        dueDate
+      );
+
+      return ResponseHandler.success(
+        res,
+        {
+          workPackageId,
+          added: true,
+        },
+        'Work package added to tasks successfully',
+        201
+      );
+    } catch (error: any) {
+      throw new BadRequestError(`Failed to add work package to tasks: ${error.message}`);
+    }
+  };
 }
