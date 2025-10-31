@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { BaseController } from '../utils/base-controller';
-import { prisma } from '../config/database';
+import prisma from '../config/database';
 import { ResponseHandler } from '../utils/response';
 import { BadRequestError, NotFoundError } from '../utils/errors';
 import { AuthRequest } from '../middleware/auth.middleware';
@@ -34,17 +34,19 @@ export class PlatformsController extends BaseController {
       throw new BadRequestError(`Invalid platform. Must be one of: ${validPlatforms.join(', ')}`);
     }
 
-    // Check if platform is already connected
+    // Check if THIS specific account is already connected
+    // Allow multiple accounts per platform, but not the same account twice
     const existing = await prisma.platformConnection.findFirst({
       where: {
         userId,
         platform: platform.toUpperCase() as any,
+        platformUsername: username,
         isActive: true,
       },
     });
 
     if (existing) {
-      throw new BadRequestError('Platform already connected. Disconnect first to reconnect.');
+      throw new BadRequestError(`Account @${username} is already connected to this platform.`);
     }
 
     // Create platform connection
@@ -81,15 +83,30 @@ export class PlatformsController extends BaseController {
   disconnectPlatform = async (req: AuthRequest, res: Response) => {
     const userId = req.user?.userId!;
     const { platform } = req.params;
+    const { connectionId } = req.query; // Optional: for disconnecting specific connection
 
     // Find active connection
-    const connection = await prisma.platformConnection.findFirst({
-      where: {
-        userId,
-        platform: platform.toUpperCase() as any,
-        isActive: true,
-      },
-    });
+    let connection;
+    if (connectionId) {
+      // Disconnect specific connection by ID
+      connection = await prisma.platformConnection.findFirst({
+        where: {
+          id: connectionId as string,
+          userId,
+          platform: platform.toUpperCase() as any,
+          isActive: true,
+        },
+      });
+    } else {
+      // Backward compatibility: disconnect first active connection
+      connection = await prisma.platformConnection.findFirst({
+        where: {
+          userId,
+          platform: platform.toUpperCase() as any,
+          isActive: true,
+        },
+      });
+    }
 
     if (!connection) {
       throw new NotFoundError('Platform connection not found or already disconnected');
@@ -107,6 +124,7 @@ export class PlatformsController extends BaseController {
       res,
       {
         platform: connection.platform,
+        username: connection.platformUsername,
         disconnected: true,
       },
       'Platform disconnected successfully'
@@ -201,5 +219,76 @@ export class PlatformsController extends BaseController {
       },
       'Platform status retrieved successfully'
     );
+  };
+
+  /**
+   * GET /api/platforms/github/repos/:connectionId
+   * Get GitHub repositories for a connected account
+   */
+  getGitHubRepositories = async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const { connectionId } = req.params;
+
+    // Verify the connection belongs to the user
+    const connection = await prisma.platformConnection.findFirst({
+      where: {
+        id: connectionId,
+        userId,
+        platform: 'GITHUB',
+        isActive: true,
+      },
+    });
+
+    if (!connection) {
+      throw new NotFoundError('GitHub connection not found');
+    }
+
+    const { GitHubIntegration } = require('../integrations/github.integration');
+    const githubIntegration = new GitHubIntegration(prisma);
+
+    const repositories = await githubIntegration.fetchRepositories(connectionId);
+
+    this.success(res, repositories, 'GitHub repositories fetched successfully');
+  };
+
+  /**
+   * GET /api/platforms/github/commits/:connectionId
+   * Get commits for a specific repository
+   * Query params: repo (required), since (optional), until (optional)
+   */
+  getGitHubCommits = async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const { connectionId } = req.params;
+    const { repo, since, until } = req.query;
+
+    if (!repo || typeof repo !== 'string') {
+      throw new BadRequestError('Repository full name is required (e.g., owner/repo)');
+    }
+
+    // Verify the connection belongs to the user
+    const connection = await prisma.platformConnection.findFirst({
+      where: {
+        id: connectionId,
+        userId,
+        platform: 'GITHUB',
+        isActive: true,
+      },
+    });
+
+    if (!connection) {
+      throw new NotFoundError('GitHub connection not found');
+    }
+
+    const { GitHubIntegration } = require('../integrations/github.integration');
+    const githubIntegration = new GitHubIntegration(prisma);
+
+    const commits = await githubIntegration.fetchRepositoryCommits(
+      connectionId,
+      repo,
+      since as string | undefined,
+      until as string | undefined
+    );
+
+    this.success(res, commits, 'Repository commits fetched successfully');
   };
 }

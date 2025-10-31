@@ -112,4 +112,18 @@ router.post(
  */
 router.get('/profile', authenticate, authController.getProfile);
 
+/**
+ * @route   GET /api/auth/github
+ * @desc    Initiate GitHub OAuth flow
+ * @access  Public
+ */
+router.get('/github', authController.githubOAuth);
+
+/**
+ * @route   GET /api/auth/github/callback
+ * @desc    GitHub OAuth callback
+ * @access  Public
+ */
+router.get('/github/callback', authController.githubOAuthCallback);
+
 export default router;

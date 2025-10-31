@@ -151,14 +151,23 @@ export const platformsApi = {
   connectPlatform: (platform: string, data: { username: string; accessToken?: string; platformUserId?: string }) =>
     api.post<ApiResponse>(`/platforms/connect/${platform}`, data),
 
-  disconnectPlatform: (platform: string) =>
-    api.delete<ApiResponse>(`/platforms/disconnect/${platform}`),
+  disconnectPlatform: (platform: string, connectionId?: string) =>
+    api.delete<ApiResponse>(`/platforms/disconnect/${platform}${connectionId ? `?connectionId=${connectionId}` : ''}`),
 
   syncPlatform: (platform: string) =>
     api.put<ApiResponse>(`/platforms/sync/${platform}`),
 
   getPlatformStatus: (platform: string) =>
     api.get<ApiResponse>(`/platforms/${platform}/status`),
+
+  // GitHub-specific methods
+  getGitHubRepositories: (connectionId: string) =>
+    api.get<ApiResponse>(`/platforms/github/repos/${connectionId}`),
+
+  getGitHubCommits: (connectionId: string, repo: string, since?: string, until?: string) =>
+    api.get<ApiResponse>(`/platforms/github/commits/${connectionId}`, {
+      params: { repo, since, until },
+    }),
 };
 
 export default api;
