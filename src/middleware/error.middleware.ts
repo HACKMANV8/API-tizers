@@ -11,9 +11,10 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ): void => {
-  // Log error
+  // Log error with safe serialization
   logger.error('Error occurred:', {
-    error: error.message,
+    message: error.message,
+    name: error.name,
     stack: error.stack,
     url: req.url,
     method: req.method,

@@ -126,6 +126,8 @@ router.get('/github', authController.githubOAuth);
  * @access  Public
  */
 router.get('/github/callback', authController.githubOAuthCallback);
+
+/**
  * @route   GET /api/auth/google
  * @desc    Initiate Google OAuth flow
  * @access  Public

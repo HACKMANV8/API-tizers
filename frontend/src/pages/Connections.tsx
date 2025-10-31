@@ -127,9 +127,6 @@ const Connections = () => {
     }
   };
 
-  const handleDisconnect = async (platform: string, connectionId?: string, username?: string) => {
-    const loadingKey = connectionId ? `${platform}-${connectionId}` : platform;
-    setLoading(loadingKey);
   const handleOpenProjectConnect = async () => {
     if (!openProjectUrl || !openProjectToken) {
       toast({
@@ -181,8 +178,9 @@ const Connections = () => {
     }
   };
 
-  const handleDisconnect = async (platform: string) => {
-    setLoading(platform);
+  const handleDisconnect = async (platform: string, connectionId?: string, username?: string) => {
+    const loadingKey = connectionId ? `${platform}-${connectionId}` : platform;
+    setLoading(loadingKey);
     try {
       await platformsApi.disconnectPlatform(platform.toLowerCase(), connectionId);
 

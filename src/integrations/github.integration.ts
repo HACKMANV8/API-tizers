@@ -1,8 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import { BaseIntegration } from '../utils/base-integration';
-import { config } from '../config';
-import { NotFoundError, ServiceUnavailableError } from '../utils/errors';
-import { startOfDay, endOfDay, subDays } from 'date-fns';
+import { NotFoundError, ServiceUnavailableError, BadRequestError } from '../utils/errors';
+import { startOfDay, endOfDay } from 'date-fns';
+import { encryptionService } from '../auth/encryption.service';
 
 export interface GitHubUser {
   login: string;
@@ -36,6 +36,24 @@ export class GitHubIntegration extends BaseIntegration {
   }
 
   /**
+   * Override authenticatedRequest to use GitHub's token authentication format
+   * GitHub PATs use "token" prefix instead of "Bearer"
+   */
+  protected async authenticatedRequest<T>(
+    config: any,
+    accessToken: string
+  ): Promise<T> {
+    const response = await this.client.request<T>({
+      ...config,
+      headers: {
+        ...config.headers,
+        Authorization: `token ${accessToken}`,
+      },
+    });
+    return response.data;
+  }
+
+  /**
    * Fetch user data from GitHub
    */
   async fetchUserData(connectionId: string): Promise<any> {
@@ -47,18 +65,37 @@ export class GitHubIntegration extends BaseIntegration {
       throw new NotFoundError('GitHub connection not found');
     }
 
+    // Check if token is encrypted
+    if (!encryptionService.isEncrypted(connection.accessToken)) {
+      this.logger.error('[GitHub] Token is not encrypted - auto-invalidating connection', { connectionId });
+
+      // Automatically mark connection as inactive
+      await this.prisma.platformConnection.update({
+        where: { id: connectionId },
+        data: { isActive: false },
+      });
+
+      throw new BadRequestError('GitHub connection has been invalidated due to security update. Please reconnect your GitHub account.');
+    }
+
+    // Decrypt the access token
+    const decryptedToken = encryptionService.decrypt(connection.accessToken);
+
     try {
       const user = await this.authenticatedRequest<GitHubUser>(
         {
           method: 'GET',
           url: '/user',
         },
-        connection.accessToken
+        decryptedToken
       );
 
       return user;
-    } catch (error) {
-      this.logger.error('[GitHub] Error fetching user data:', error);
+    } catch (error: any) {
+      this.logger.error('[GitHub] Error fetching user data:', {
+        message: error.message,
+        status: error.response?.status,
+      });
       throw new ServiceUnavailableError('Failed to fetch GitHub user data');
     }
   }
@@ -109,14 +146,20 @@ export class GitHubIntegration extends BaseIntegration {
         } catch (error: any) {
           // Skip repos that can't be accessed
           if (error.response?.status !== 404) {
-            this.logger.warn(`[GitHub] Error fetching commits for ${repo.full_name}:`, error);
+            this.logger.warn(`[GitHub] Error fetching commits for ${repo.full_name}:`, {
+              message: error.message,
+              status: error.response?.status,
+            });
           }
         }
       }
 
       return totalCommits;
-    } catch (error) {
-      this.logger.error('[GitHub] Error fetching commits:', error);
+    } catch (error: any) {
+      this.logger.error('[GitHub] Error fetching commits:', {
+        message: error.message,
+        status: error.response?.status,
+      });
       return 0;
     }
   }
@@ -144,8 +187,11 @@ export class GitHubIntegration extends BaseIntegration {
       );
 
       return prs.length || 0;
-    } catch (error) {
-      this.logger.error('[GitHub] Error fetching pull requests:', error);
+    } catch (error: any) {
+      this.logger.error('[GitHub] Error fetching pull requests:', {
+        message: error.message,
+        status: error.response?.status,
+      });
       return 0;
     }
   }
@@ -173,8 +219,11 @@ export class GitHubIntegration extends BaseIntegration {
       );
 
       return issues.length || 0;
-    } catch (error) {
-      this.logger.error('[GitHub] Error fetching issues:', error);
+    } catch (error: any) {
+      this.logger.error('[GitHub] Error fetching issues:', {
+        message: error.message,
+        status: error.response?.status,
+      });
       return 0;
     }
   }
@@ -202,8 +251,11 @@ export class GitHubIntegration extends BaseIntegration {
       );
 
       return reviews.length || 0;
-    } catch (error) {
-      this.logger.error('[GitHub] Error fetching reviews:', error);
+    } catch (error: any) {
+      this.logger.error('[GitHub] Error fetching reviews:', {
+        message: error.message,
+        status: error.response?.status,
+      });
       return 0;
     }
   }
@@ -224,6 +276,23 @@ export class GitHubIntegration extends BaseIntegration {
     }
 
     try {
+      // Check if token is encrypted
+      if (!encryptionService.isEncrypted(connection.accessToken)) {
+        this.logger.error('[GitHub] Token is not encrypted - auto-invalidating connection', { connectionId });
+
+        // Automatically mark connection as inactive
+        await this.prisma.platformConnection.update({
+          where: { id: connectionId },
+          data: { isActive: false },
+        });
+
+        throw new BadRequestError('GitHub connection has been invalidated due to security update. Please reconnect your GitHub account.');
+      }
+
+      // Decrypt the access token
+      const decryptedToken = encryptionService.decrypt(connection.accessToken);
+      this.logger.info('[GitHub] Fetching repositories for connection', { connectionId });
+
       const repos = await this.authenticatedRequest<any[]>(
         {
           method: 'GET',
@@ -233,8 +302,10 @@ export class GitHubIntegration extends BaseIntegration {
             per_page: 100,
           },
         },
-        connection.accessToken
+        decryptedToken
       );
+
+      this.logger.info('[GitHub] Successfully fetched repositories', { count: repos.length });
 
       return repos.map((repo: any) => ({
         id: repo.id,
@@ -251,8 +322,14 @@ export class GitHubIntegration extends BaseIntegration {
         pushedAt: repo.pushed_at,
       }));
     } catch (error: any) {
-      this.logger.error('[GitHub] Error fetching repositories:', error);
-      throw new ServiceUnavailableError('Failed to fetch GitHub repositories');
+      this.logger.error('[GitHub] Error fetching repositories:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        connectionId,
+      });
+      throw new ServiceUnavailableError(`Failed to fetch GitHub repositories: ${error.message}`);
     }
   }
 
@@ -273,6 +350,22 @@ export class GitHubIntegration extends BaseIntegration {
       throw new NotFoundError('GitHub connection not found');
     }
 
+    // Check if token is encrypted
+    if (!encryptionService.isEncrypted(connection.accessToken)) {
+      this.logger.error('[GitHub] Token is not encrypted - auto-invalidating connection', { connectionId });
+
+      // Automatically mark connection as inactive
+      await this.prisma.platformConnection.update({
+        where: { id: connectionId },
+        data: { isActive: false },
+      });
+
+      throw new BadRequestError('GitHub connection has been invalidated due to security update. Please reconnect your GitHub account.');
+    }
+
+    // Decrypt the access token
+    const decryptedToken = encryptionService.decrypt(connection.accessToken);
+
     try {
       const params: any = {
         per_page: 100,
@@ -286,7 +379,7 @@ export class GitHubIntegration extends BaseIntegration {
           url: `/repos/${repoFullName}/commits`,
           params,
         },
-        connection.accessToken
+        decryptedToken
       );
 
       return commits.map((commit: any) => ({
@@ -302,12 +395,16 @@ export class GitHubIntegration extends BaseIntegration {
         stats: commit.stats,
       }));
     } catch (error: any) {
-      this.logger.error('[GitHub] Error fetching repository commits:', error);
+      this.logger.error('[GitHub] Error fetching repository commits:', {
+        message: error.message,
+        status: error.response?.status,
+        repo: repoFullName,
+      });
       throw new ServiceUnavailableError('Failed to fetch repository commits');
     }
   }
 
-  async fetchLanguageStats(username: string, accessToken: string): Promise<any> {
+  async fetchLanguageStats(accessToken: string): Promise<any> {
     try {
       const repos = await this.authenticatedRequest<any[]>(
         {
@@ -329,8 +426,11 @@ export class GitHubIntegration extends BaseIntegration {
       }
 
       return languageStats;
-    } catch (error) {
-      this.logger.error('[GitHub] Error fetching language stats:', error);
+    } catch (error: any) {
+      this.logger.error('[GitHub] Error fetching language stats:', {
+        message: error.message,
+        status: error.response?.status,
+      });
       return {};
     }
   }
@@ -350,6 +450,22 @@ export class GitHubIntegration extends BaseIntegration {
         throw new NotFoundError('GitHub connection not found or incomplete');
       }
 
+      // Check if token is encrypted
+      if (!encryptionService.isEncrypted(connection.accessToken)) {
+        this.logger.error('[GitHub] Token is not encrypted - auto-invalidating connection', { connectionId });
+
+        // Automatically mark connection as inactive
+        await this.prisma.platformConnection.update({
+          where: { id: connectionId },
+          data: { isActive: false },
+        });
+
+        throw new BadRequestError('GitHub connection has been invalidated due to security update. Please reconnect your GitHub account.');
+      }
+
+      // Decrypt the access token
+      const decryptedToken = encryptionService.decrypt(connection.accessToken);
+
       // Fetch user data
       const userData = await this.fetchUserData(connectionId);
 
@@ -359,13 +475,13 @@ export class GitHubIntegration extends BaseIntegration {
       const endOfToday = endOfDay(today);
 
       const [commits, pullRequests, issues, reviews] = await Promise.all([
-        this.fetchCommits(connection.platformUsername, connection.accessToken, startOfToday, endOfToday),
-        this.fetchPullRequests(connection.platformUsername, connection.accessToken, startOfToday, endOfToday),
-        this.fetchIssues(connection.platformUsername, connection.accessToken, startOfToday, endOfToday),
-        this.fetchReviews(connection.platformUsername, connection.accessToken, startOfToday, endOfToday),
+        this.fetchCommits(connection.platformUsername, decryptedToken, startOfToday, endOfToday),
+        this.fetchPullRequests(connection.platformUsername, decryptedToken, startOfToday, endOfToday),
+        this.fetchIssues(connection.platformUsername, decryptedToken, startOfToday, endOfToday),
+        this.fetchReviews(connection.platformUsername, decryptedToken, startOfToday, endOfToday),
       ]);
 
-      const languageStats = await this.fetchLanguageStats(connection.platformUsername, connection.accessToken);
+      const languageStats = await this.fetchLanguageStats(decryptedToken);
 
       // Upsert GitHub stats
       await this.prisma.githubStat.upsert({
@@ -406,7 +522,12 @@ export class GitHubIntegration extends BaseIntegration {
       this.logger.info('[GitHub] Sync completed successfully', { userId, connectionId });
     } catch (error: any) {
       await this.updateSyncStatus(connectionId, 'FAILED', error.message);
-      this.logger.error('[GitHub] Sync failed:', error);
+      this.logger.error('[GitHub] Sync failed:', {
+        message: error.message,
+        status: error.response?.status,
+        userId,
+        connectionId,
+      });
       throw error;
     }
   }

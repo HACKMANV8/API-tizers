@@ -67,6 +67,8 @@ router.get('/github/repos/:connectionId', authenticate, platformsController.getG
  * @query   repo: Repository full name (owner/repo), since: ISO date, until: ISO date
  */
 router.get('/github/commits/:connectionId', authenticate, platformsController.getGitHubCommits);
+
+/**
  * @route   GET /api/v1/platforms/openproject/projects
  * @desc    Get all OpenProject projects
  * @access  Private

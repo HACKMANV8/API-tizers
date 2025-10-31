@@ -4,6 +4,7 @@ import { BaseController } from '../utils/base-controller';
 import prisma from '../config/database';
 import { JwtService } from '../auth/jwt.service';
 import { User } from '@prisma/client';
+import { encryptionService } from '../auth/encryption.service';
 
 export class AuthController extends BaseController {
   private authService: AuthService;
@@ -173,6 +174,12 @@ export class AuthController extends BaseController {
       const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}`;
 
       res.redirect(githubAuthUrl);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
    * GET /api/auth/google/callback
    * Handle Google OAuth callback
    */
@@ -250,12 +257,15 @@ export class AuthController extends BaseController {
       // Get user info from GitHub
       const userResponse = await axios.get('https://api.github.com/user', {
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `token ${accessToken}`,
         },
       });
 
       const githubUser = userResponse.data;
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+
+      // Encrypt the access token before storing
+      const encryptedToken = encryptionService.encrypt(accessToken);
 
       // Check if THIS specific GitHub account already exists (active or inactive)
       // Allow multiple GitHub accounts, but handle existing connections intelligently
@@ -272,12 +282,12 @@ export class AuthController extends BaseController {
           // Already connected and active - show error
           return res.redirect(`${frontendUrl}/connections?error=account_already_connected&username=${githubUser.login}`);
         } else {
-          // Exists but inactive - reactivate it
+          // Exists but inactive - reactivate it with encrypted token
           await prisma.platformConnection.update({
             where: { id: existing.id },
             data: {
               platformUserId: githubUser.id.toString(),
-              accessToken: accessToken,
+              accessToken: encryptedToken,
               isActive: true,
               syncStatus: 'PENDING',
               metadata: {},
@@ -287,14 +297,14 @@ export class AuthController extends BaseController {
         }
       }
 
-      // Doesn't exist - create new platform connection
+      // Doesn't exist - create new platform connection with encrypted token
       await prisma.platformConnection.create({
         data: {
           userId,
           platform: 'GITHUB',
           platformUserId: githubUser.id.toString(),
           platformUsername: githubUser.login,
-          accessToken: accessToken,
+          accessToken: encryptedToken,
           isActive: true,
           syncStatus: 'PENDING',
           metadata: {},

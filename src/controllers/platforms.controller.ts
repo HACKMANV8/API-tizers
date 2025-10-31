@@ -75,6 +75,9 @@ export class PlatformsController extends BaseController {
         throw new BadRequestError('Invalid OpenProject instance URL. Must be a valid HTTP(S) URL.');
       }
 
+      // Normalize instanceUrl (remove trailing slash for consistency)
+      const normalizedInstanceUrl = instanceUrl.replace(/\/$/, '');
+
       // Encrypt the access token
       const encryptedToken = encryptionService.encrypt(accessToken);
 
@@ -89,7 +92,7 @@ export class PlatformsController extends BaseController {
           isActive: true,
           syncStatus: 'PENDING',
           metadata: {
-            instanceUrl,
+            instanceUrl: normalizedInstanceUrl,
           },
         },
       });
@@ -97,15 +100,38 @@ export class PlatformsController extends BaseController {
       // Verify the connection by fetching user data
       try {
         const userData = await this.openProjectIntegration.fetchUserData(connection.id);
+        const fetchedUsername = userData.login || userData.email;
+
+        // Check if there's an existing connection (active or inactive) with the same username
+        // This could be a previous connection that was disconnected
+        const existingConnection = await prisma.platformConnection.findFirst({
+          where: {
+            userId,
+            platform: 'OPENPROJECT',
+            platformUsername: fetchedUsername,
+            id: { not: connection.id }, // Exclude the current connection
+          },
+        });
+
+        // If there's an existing connection, delete it to avoid unique constraint violation
+        if (existingConnection) {
+          this.logger.info('[PlatformsController] Removing old OpenProject connection:', {
+            oldConnectionId: existingConnection.id,
+            username: fetchedUsername,
+          });
+          await prisma.platformConnection.delete({
+            where: { id: existingConnection.id },
+          });
+        }
 
         // Update connection with user data
         await prisma.platformConnection.update({
           where: { id: connection.id },
           data: {
             platformUserId: userData.id.toString(),
-            platformUsername: userData.login || userData.email,
+            platformUsername: fetchedUsername,
             metadata: {
-              instanceUrl,
+              instanceUrl: normalizedInstanceUrl,
               email: userData.email,
               name: userData.name,
             },
@@ -117,9 +143,9 @@ export class PlatformsController extends BaseController {
           {
             id: connection.id,
             platform: connection.platform,
-            username: userData.login || userData.email,
+            username: fetchedUsername,
             email: userData.email,
-            instanceUrl,
+            instanceUrl: normalizedInstanceUrl,
             connected: true,
           },
           'OpenProject connected successfully',
@@ -362,7 +388,7 @@ export class PlatformsController extends BaseController {
    * Get GitHub repositories for a connected account
    */
   getGitHubRepositories = async (req: AuthRequest, res: Response) => {
-    const userId = req.user!.userId;
+    const userId = req.user!.id;
     const { connectionId } = req.params;
 
     // Verify the connection belongs to the user
@@ -371,18 +397,6 @@ export class PlatformsController extends BaseController {
         id: connectionId,
         userId,
         platform: 'GITHUB',
-   * GET /api/v1/platforms/openproject/projects
-   * Get all OpenProject projects
-   */
-  getOpenProjectProjects = async (req: AuthRequest, res: Response) => {
-    const userId = req.user?.id!;
-
-    // Find active OpenProject connection
-    const connection = await prisma.platformConnection.findFirst({
-      where: {
-        userId,
-        platform: 'OPENPROJECT',
-        isActive: true,
       },
     });
 
@@ -399,12 +413,48 @@ export class PlatformsController extends BaseController {
   };
 
   /**
+   * GET /api/v1/platforms/openproject/projects
+   * Get all OpenProject projects
+   */
+  getOpenProjectProjects = async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.id!;
+
+    // Find active OpenProject connection
+    const connection = await prisma.platformConnection.findFirst({
+      where: {
+        userId,
+        platform: 'OPENPROJECT',
+        isActive: true,
+      },
+    });
+
+    if (!connection) {
+      throw new NotFoundError('OpenProject connection not found');
+    }
+
+    try {
+      const projects = await this.openProjectIntegration.fetchProjects(connection.id);
+
+      return ResponseHandler.success(
+        res,
+        {
+          projects,
+          total: projects.length,
+        },
+        'OpenProject projects retrieved successfully'
+      );
+    } catch (error: any) {
+      throw new BadRequestError(`Failed to fetch projects: ${error.message}`);
+    }
+  };
+
+  /**
    * GET /api/platforms/github/commits/:connectionId
    * Get commits for a specific repository
    * Query params: repo (required), since (optional), until (optional)
    */
   getGitHubCommits = async (req: AuthRequest, res: Response) => {
-    const userId = req.user!.userId;
+    const userId = req.user!.id;
     const { connectionId } = req.params;
     const { repo, since, until } = req.query;
 
@@ -418,23 +468,24 @@ export class PlatformsController extends BaseController {
         id: connectionId,
         userId,
         platform: 'GITHUB',
-      throw new NotFoundError('OpenProject connection not found');
+      },
+    });
+
+    if (!connection) {
+      throw new NotFoundError('GitHub connection not found');
     }
 
-    try {
-      const projects = await this.openProjectIntegration.fetchProjects(connection.id);
+    const { GitHubIntegration } = require('../integrations/github.integration');
+    const githubIntegration = new GitHubIntegration(prisma);
 
-      return ResponseHandler.success(
-        res,
-        {
-          projects,
-          total: projects.length,
-        },
-        'Projects retrieved successfully'
-      );
-    } catch (error: any) {
-      throw new BadRequestError(`Failed to fetch projects: ${error.message}`);
-    }
+    const commits = await githubIntegration.fetchRepositoryCommits(
+      connectionId,
+      repo,
+      since as string | undefined,
+      until as string | undefined
+    );
+
+    this.success(res, commits, 'GitHub commits fetched successfully');
   };
 
   /**
@@ -497,20 +548,6 @@ export class PlatformsController extends BaseController {
     });
 
     if (!connection) {
-      throw new NotFoundError('GitHub connection not found');
-    }
-
-    const { GitHubIntegration } = require('../integrations/github.integration');
-    const githubIntegration = new GitHubIntegration(prisma);
-
-    const commits = await githubIntegration.fetchRepositoryCommits(
-      connectionId,
-      repo,
-      since as string | undefined,
-      until as string | undefined
-    );
-
-    this.success(res, commits, 'Repository commits fetched successfully');
       throw new NotFoundError('OpenProject connection not found');
     }
 

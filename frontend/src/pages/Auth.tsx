@@ -181,7 +181,8 @@ const Auth = () => {
                   variant="outline"
                   className="w-full h-11 bg-surface/50 border-border hover:bg-surface hover:border-cyan transition-colors"
                   onClick={() => {
-                    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/v1/auth/google`;
+                    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api/v1';
+                    window.location.href = `${apiBaseUrl}/auth/google`;
                   }}
                 >
                   <FcGoogle className="mr-2 h-5 w-5" />

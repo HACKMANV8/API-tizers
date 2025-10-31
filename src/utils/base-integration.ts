@@ -40,7 +40,11 @@ export abstract class BaseIntegration {
         return config;
       },
       (error) => {
-        this.logger.error(`[${this.platformName}] Request error:`, error);
+        this.logger.error(`[${this.platformName}] Request error:`, {
+          message: error.message,
+          code: error.code,
+          url: error.config?.url,
+        });
         return Promise.reject(error);
       }
     );
@@ -53,8 +57,10 @@ export abstract class BaseIntegration {
       (error) => {
         this.logger.error(`[${this.platformName}] Response error:`, {
           status: error.response?.status,
+          statusText: error.response?.statusText,
           data: error.response?.data,
           url: error.config?.url,
+          message: error.message,
         });
         return Promise.reject(error);
       }
