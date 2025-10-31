@@ -12,6 +12,9 @@ import { apiLimiter } from './middleware/rate-limit.middleware';
 
 // Import routes
 import authRoutes from './routes/auth.routes';
+import leaderboardRoutes from './routes/leaderboard.routes';
+import userRoutes from './routes/user.routes';
+import platformsRoutes from './routes/platforms.routes';
 
 const app: Application = express();
 
@@ -53,13 +56,13 @@ app.get('/health', (req: Request, res: Response) => {
 
 // API routes
 app.use(`/api/${config.apiVersion}/auth`, authRoutes);
+app.use(`/api/${config.apiVersion}/leaderboard`, leaderboardRoutes);
+app.use(`/api/${config.apiVersion}/users`, userRoutes);
+app.use(`/api/${config.apiVersion}/platforms`, platformsRoutes);
 
 // TODO: Add more routes here as they're implemented
-// app.use(`/api/${config.apiVersion}/users`, userRoutes);
-// app.use(`/api/${config.apiVersion}/platforms`, platformRoutes);
 // app.use(`/api/${config.apiVersion}/tasks`, taskRoutes);
 // app.use(`/api/${config.apiVersion}/missions`, missionRoutes);
-// app.use(`/api/${config.apiVersion}/leaderboard`, leaderboardRoutes);
 // app.use(`/api/${config.apiVersion}/portfolio`, portfolioRoutes);
 
 // 404 handler
