@@ -177,6 +177,15 @@ export const platformsApi = {
     api.get<ApiResponse>(`/platforms/codeforces/submissions/${connectionId}`, {
       params: { count },
     }),
+
+  // LeetCode-specific methods
+  getLeetCodeStats: (connectionId: string) =>
+    api.get<ApiResponse>(`/platforms/leetcode/stats/${connectionId}`),
+
+  getLeetCodeSubmissions: (connectionId: string, limit?: number) =>
+    api.get<ApiResponse>(`/platforms/leetcode/submissions/${connectionId}`, {
+      params: { limit },
+    }),
 };
 
 export default api;

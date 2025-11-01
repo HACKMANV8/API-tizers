@@ -84,4 +84,21 @@ router.get('/codeforces/stats/:connectionId', authenticate, platformsController.
  */
 router.get('/codeforces/submissions/:connectionId', authenticate, platformsController.getCodeforcesSubmissions);
 
+/**
+ * @route   GET /api/v1/platforms/leetcode/stats/:connectionId
+ * @desc    Get LeetCode stats for a connected account
+ * @access  Private
+ * @param   connectionId: Platform connection ID
+ */
+router.get('/leetcode/stats/:connectionId', authenticate, platformsController.getLeetCodeStats);
+
+/**
+ * @route   GET /api/v1/platforms/leetcode/submissions/:connectionId
+ * @desc    Get recent submissions for a LeetCode account
+ * @access  Private
+ * @param   connectionId: Platform connection ID
+ * @query   limit: Number of submissions to fetch (optional, default 15)
+ */
+router.get('/leetcode/submissions/:connectionId', authenticate, platformsController.getLeetCodeSubmissions);
+
 export default router;

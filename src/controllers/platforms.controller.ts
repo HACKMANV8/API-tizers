@@ -75,7 +75,7 @@ export class PlatformsController extends BaseController {
       });
     }
 
-    // Trigger immediate sync for Codeforces to fetch initial stats
+    // Trigger immediate sync for Codeforces and LeetCode to fetch initial stats
     if (platform.toUpperCase() === 'CODEFORCES') {
       try {
         const { CodeforcesIntegration } = require('../integrations/codeforces.integration');
@@ -86,6 +86,17 @@ export class PlatformsController extends BaseController {
         });
       } catch (error) {
         console.error('[Codeforces] Failed to trigger initial sync:', error);
+      }
+    } else if (platform.toUpperCase() === 'LEETCODE') {
+      try {
+        const { LeetCodeIntegration } = require('../integrations/leetcode.integration');
+        const leetcodeIntegration = new LeetCodeIntegration(prisma);
+        // Sync in background - don't await to avoid blocking response
+        leetcodeIntegration.syncData(userId, connection.id).catch((error) => {
+          console.error('[LeetCode] Initial sync failed:', error);
+        });
+      } catch (error) {
+        console.error('[LeetCode] Failed to trigger initial sync:', error);
       }
     }
 
@@ -397,5 +408,86 @@ export class PlatformsController extends BaseController {
     );
 
     this.success(res, submissions, 'Codeforces submissions fetched successfully');
+  };
+
+  /**
+   * GET /api/platforms/leetcode/stats/:connectionId
+   * Get LeetCode stats for a connected account
+   */
+  getLeetCodeStats = async (req: Request, res: Response) => {
+    const userId = (req as any).user!.id;
+    const { connectionId } = req.params;
+
+    // Verify the connection belongs to the user
+    const connection = await prisma.platformConnection.findFirst({
+      where: {
+        id: connectionId,
+        userId,
+        platform: 'LEETCODE',
+        isActive: true,
+      },
+    });
+
+    if (!connection) {
+      throw new NotFoundError('LeetCode connection not found');
+    }
+
+    // Always trigger a fresh sync to get latest data
+    const { LeetCodeIntegration } = require('../integrations/leetcode.integration');
+    const leetcodeIntegration = new LeetCodeIntegration(prisma);
+
+    try {
+      await leetcodeIntegration.syncData(userId, connectionId);
+
+      // Fetch the newly synced stats
+      const stats = await prisma.cpStat.findFirst({
+        where: {
+          connectionId,
+          platform: 'LEETCODE',
+        },
+        orderBy: {
+          date: 'desc',
+        },
+      });
+
+      this.success(res, stats, 'LeetCode stats fetched successfully');
+    } catch (error: any) {
+      throw new ServiceUnavailableError('Failed to sync LeetCode data');
+    }
+  };
+
+  /**
+   * GET /api/platforms/leetcode/submissions/:connectionId
+   * Get recent submissions for a LeetCode account
+   * Query params: limit (optional, default 15)
+   */
+  getLeetCodeSubmissions = async (req: Request, res: Response) => {
+    const userId = (req as any).user!.id;
+    const { connectionId } = req.params;
+    const { limit } = req.query;
+
+    // Verify the connection belongs to the user
+    const connection = await prisma.platformConnection.findFirst({
+      where: {
+        id: connectionId,
+        userId,
+        platform: 'LEETCODE',
+        isActive: true,
+      },
+    });
+
+    if (!connection) {
+      throw new NotFoundError('LeetCode connection not found');
+    }
+
+    const { LeetCodeIntegration } = require('../integrations/leetcode.integration');
+    const leetcodeIntegration = new LeetCodeIntegration(prisma);
+
+    const submissions = await leetcodeIntegration.fetchSubmissions(
+      connection.platformUsername,
+      limit ? parseInt(limit as string, 10) : 15
+    );
+
+    this.success(res, submissions, 'LeetCode submissions fetched successfully');
   };
 }

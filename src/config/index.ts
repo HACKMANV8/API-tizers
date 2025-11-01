@@ -37,7 +37,6 @@ export const config = {
   // Platform APIs
   platforms: {
     leetcode: {
-      session: process.env.LEETCODE_SESSION,
       apiUrl: process.env.LEETCODE_API_URL || 'https://leetcode.com/graphql',
     },
     codeforces: {

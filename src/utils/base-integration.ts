@@ -120,7 +120,7 @@ export abstract class BaseIntegration {
       data: {
         syncStatus: status,
         lastSynced: status === 'COMPLETED' ? new Date() : undefined,
-        metadata: errorMessage ? { lastError: errorMessage } : undefined,
+        metadata: errorMessage ? { lastError: String(errorMessage).substring(0, 500) } : undefined,
       },
     });
   }

@@ -7,6 +7,7 @@ import * as LucideIcons from "lucide-react";
 import { Loader2, Search } from "lucide-react";
 import { GitHubStats } from "@/components/GitHubStats";
 import { CodeforcesStats } from "@/components/CodeforcesStats";
+import { LeetCodeStats } from "@/components/LeetCodeStats";
 
 const Dashboard = () => {
   // Fetch activity feed
@@ -47,6 +48,10 @@ const Dashboard = () => {
   // Get Codeforces connections
   const codeforcesPlatform = platforms.find((p: any) => p.name === 'Codeforces');
   const codeforcesConnections = codeforcesPlatform?.connections || [];
+
+  // Get LeetCode connections
+  const leetcodePlatform = platforms.find((p: any) => p.name === 'LeetCode');
+  const leetcodeConnections = leetcodePlatform?.connections || [];
 
   return (
     <DashboardLayout>
@@ -292,7 +297,12 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Placeholder for LeetCode - will go in the other half */}
+        {/* LeetCode Stats - Half width next to Codeforces */}
+        {leetcodeConnections.length > 0 && (
+          <div className="md:col-span-1 lg:col-span-1">
+            <LeetCodeStats connections={leetcodeConnections} />
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
