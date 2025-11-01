@@ -93,8 +93,8 @@ export function LeetCodeStats({ connections }: LeetCodeStatsProps) {
 
   if (connections.length === 0) {
     return (
-      <Card className="glass-card border-border/50">
-        <CardContent className="pt-6">
+      <Card className="glass-card border-border/50 h-full flex flex-col">
+        <CardContent className="pt-6 flex-1">
           <p className="text-sm text-muted-foreground text-center">
             No LeetCode accounts connected. Connect one to see your stats!
           </p>
@@ -119,7 +119,7 @@ export function LeetCodeStats({ connections }: LeetCodeStatsProps) {
   };
 
   return (
-    <Card className="glass-card border-border/50">
+    <Card className="glass-card border-border/50 h-full flex flex-col">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -128,7 +128,7 @@ export function LeetCodeStats({ connections }: LeetCodeStatsProps) {
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 flex-1">
         {/* Connection Selector */}
         {connections.length > 1 && (
           <div className="space-y-2">

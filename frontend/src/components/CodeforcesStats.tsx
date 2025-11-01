@@ -84,8 +84,8 @@ export function CodeforcesStats({ connections }: CodeforcesStatsProps) {
 
   if (connections.length === 0) {
     return (
-      <Card className="glass-card border-border/50">
-        <CardContent className="pt-6">
+      <Card className="glass-card border-border/50 h-full flex flex-col">
+        <CardContent className="pt-6 flex-1">
           <p className="text-sm text-muted-foreground text-center">
             No Codeforces accounts connected. Connect one to see your stats!
           </p>
@@ -125,7 +125,7 @@ export function CodeforcesStats({ connections }: CodeforcesStatsProps) {
   const rank = stats?.rating ? getRankBadge(stats.rating) : { name: 'Unrated', color: 'text-gray-500' };
 
   return (
-    <Card className="glass-card border-border/50">
+    <Card className="glass-card border-border/50 h-full flex flex-col">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -134,7 +134,7 @@ export function CodeforcesStats({ connections }: CodeforcesStatsProps) {
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 flex-1">
         {/* Connection Selector */}
         {connections.length > 1 && (
           <div className="space-y-2">

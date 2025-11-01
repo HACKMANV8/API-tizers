@@ -292,14 +292,14 @@ const Dashboard = () => {
 
         {/* Codeforces Stats - Half width */}
         {codeforcesConnections.length > 0 && (
-          <div className="md:col-span-1 lg:col-span-1">
+          <div className="md:col-span-1 lg:col-span-1 flex">
             <CodeforcesStats connections={codeforcesConnections} />
           </div>
         )}
 
-        {/* LeetCode Stats - Half width next to Codeforces */}
+        {/* LeetCode Stats - Takes remaining 2/3 width next to Codeforces */}
         {leetcodeConnections.length > 0 && (
-          <div className="md:col-span-1 lg:col-span-1">
+          <div className="md:col-span-1 lg:col-span-2 flex">
             <LeetCodeStats connections={leetcodeConnections} />
           </div>
         )}
